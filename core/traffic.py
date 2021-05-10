@@ -44,4 +44,3 @@ class TrafficAnalyzer(threading.Thread):
     """
     A thread used for analyzing traffic saved into DB from TrafficCatcher
     """
-    pass
