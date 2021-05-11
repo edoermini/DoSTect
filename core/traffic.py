@@ -1,4 +1,4 @@
-import time
+import datetime
 import threading
 from scapy.sendrecv import sniff
 from scapy.layers.inet import TCP
@@ -18,8 +18,8 @@ class TrafficAnalyzer:
 
         self.alpha = alpha
         self.beta = beta
-        self.threshold = 10
-        self.sigma = 10
+        self.threshold = 5
+        self.sigma = 100
 
         self.time_interval = time_interval
 
@@ -52,12 +52,11 @@ class TrafficAnalyzer:
             self.syn_counter = 0
 
         val = self.__g(syn_count)
-
         print(val)
 
+        
         if val > self.threshold:
-            print("WARNING DDoS detected")
-
+            self.last_g = 0
         threading.Timer(self.time_interval, self.__counter_reader).start()
 
     def __callback(self, pkt):
