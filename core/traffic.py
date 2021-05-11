@@ -27,17 +27,26 @@ class TrafficAnalyzer:
 
         self.__threshold_exceeded = False
 
-    def __ewma(self, syn_count) -> float:
-        new_ewma = self.beta * self.__last_ewma + (1 - self.beta) * syn_count
-        self.__last_ewma = new_ewma
-
-        return new_ewma
-
     def __g(self, syn_count):
+        """
+        Cumulative sum (CUSUM) implementation. \n
+        Equation:
+            - g_{n} = max( (g_{n-1} + (alpha*mu_{n-1} / sigma^{2}) * (x_{n} - mu_{n-1} - alpha*mu_{n-1}/2) , 0) \n
+            - mu_{n} = beta*mu_{n-1} + (1- beta)*x_{n}
+
+        where x_{n} is the metric (number of SYN packets) at interval n
+
+        :param syn_count: x_{n}, the metric (number of SYN packets)
+        :return: g_{n}, the volume
+        """
+
+        # calulating cusum value
         new_g = self.__last_g + ((self.alpha * self.__last_ewma) / (self.sigma ** 2)) * (
                     syn_count - self.__last_ewma - self.alpha * self.__last_ewma / 2)
 
-        self.__ewma(syn_count)
+        # updating exponentially weighted moving average
+        new_ewma = self.beta * self.__last_ewma + (1 - self.beta) * syn_count
+        self.__last_ewma = new_ewma
 
         if new_g > 0:
             self.__last_g = new_g
@@ -47,6 +56,13 @@ class TrafficAnalyzer:
         return self.__last_g
 
     def __counter_reader(self):
+        """
+        - Computes the volume with cusum algorithm __g and checks if threshold has been exceeded.
+        - Resets the syn counter for the next interval
+        - If threshold is exceeded resets last computed volume to 0.
+        - If threshold is not exceeded but in last interval an attack was detected resets last computed ewma to 0.
+        """
+
         syn_count = 0
 
         with self.syn_counter_lock:
