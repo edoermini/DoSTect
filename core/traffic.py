@@ -1,7 +1,7 @@
 import datetime
 import threading
 from scapy.sendrecv import sniff
-from scapy.layers.inet import TCP
+from scapy.layers.inet import ICMP, TCP, UDP
 
 
 class TrafficAnalyzer:
@@ -21,6 +21,9 @@ class TrafficAnalyzer:
 
         self.syn_counter_lock = threading.Lock()
         self.syn_counter = 0
+
+        self.udp_counter_lock = threading.Lock()
+        self.udp_counter = 0
 
         self.__last_g = 0
         self.__last_ewma = 0
@@ -102,6 +105,11 @@ class TrafficAnalyzer:
         if pkt.haslayer(TCP) and pkt[TCP].flags & syn:
             with self.syn_counter_lock:
                 self.syn_counter += 1
+        
+        if pkt.haslayer(UDP):
+            with self.udp_counter_lock:
+                self.udp_counter += 1
+                print("UDP packets: {}".format(self.udp_counter))
 
     def start(self):
         """
