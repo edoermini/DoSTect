@@ -1,36 +1,24 @@
-import datetime
 import threading
 from scapy.sendrecv import sniff
-from scapy.layers.inet import ICMP, TCP, UDP
+from scapy.layers.inet import TCP, UDP
 
 
-class TrafficAnalyzer:
-    """
-    A thread used for capturing traffic and saving data of interest into DB
-    """
-
-    def __init__(self, source, live_capture=False, threshold=10, sigma=100, time_interval=5, alpha=0.5, beta=0.99):
-        self.source = source
-        self.live_capture = live_capture
-
+class Counter:
+    def __init__(self, threshold, sigma, alpha, beta):
         self.threshold = threshold
         self.sigma = sigma
-        self.time_interval = time_interval
         self.alpha = alpha
         self.beta = beta
 
-        self.syn_counter_lock = threading.Lock()
-        self.syn_counter = 0
+        self.counter_lock = threading.Lock()
+        self.counter = 0
 
-        self.udp_counter_lock = threading.Lock()
-        self.udp_counter = 0
-
-        self.__last_g = 0
+        self.__last_cusum = 0
         self.__last_ewma = 0
 
         self.__threshold_exceeded = False
 
-    def __g(self, syn_count):
+    def compute_volume(self):
         """
         Cumulative sum (CUSUM) implementation. \n
         Equation:
@@ -38,25 +26,58 @@ class TrafficAnalyzer:
             - mu_{n} = beta*mu_{n-1} + (1- beta)*x_{n}
 
         where x_{n} is the metric (number of SYN packets) at interval n
-
-        :param syn_count: x_{n}, the metric (number of SYN packets)
-        :return: g_{n}, the volume
         """
 
+        counter = 0
+
+        with self.counter_lock:
+            counter = self.counter
+            self.counter = 0
+
         # calulating cusum value
-        new_g = self.__last_g + ((self.alpha * self.__last_ewma) / (self.sigma ** 2)) * (
-                    syn_count - self.__last_ewma - self.alpha * self.__last_ewma / 2)
+        new_cusum = self.__last_cusum + ((self.alpha * self.__last_ewma) / (self.sigma ** 2)) * (
+                counter - self.__last_ewma - self.alpha * self.__last_ewma / 2)
+
+        self.__last_cusum = max(new_cusum, 0)
 
         # updating exponentially weighted moving average
-        new_ewma = self.beta * self.__last_ewma + (1 - self.beta) * syn_count
+        new_ewma = self.beta * self.__last_ewma + (1 - self.beta) * counter
         self.__last_ewma = new_ewma
 
-        if new_g > 0:
-            self.__last_g = new_g
+        # checking violation
+        if self.__last_cusum > self.threshold:
+            self.__last_cusum = 0
+            self.__threshold_exceeded = True
         else:
-            self.__last_g = 0
+            # violation not detected
+            self.__threshold_exceeded = False
 
-        return self.__last_g
+    def get_volume(self):
+        return self.__last_cusum
+
+    def increase(self):
+        with self.counter_lock:
+            self.counter += 1
+
+    def get_value(self):
+        return self.counter
+
+    def threshold_exceeded(self):
+        return self.__threshold_exceeded
+
+
+class TrafficAnalyzer:
+    """
+    A thread used for capturing traffic and saving data of interest into DB
+    """
+
+    def __init__(self, source, live_capture=False, time_interval=5):
+        self.source = source
+        self.live_capture = live_capture
+        self.time_interval = time_interval
+
+        self.syn_counter = Counter(threshold=10, sigma=100, alpha=0.5, beta=0.95)
+        self.udp_counter = Counter(threshold=10, sigma=1000, alpha=0.5, beta=0.95)
 
     def __counter_reader(self):
         """
@@ -66,28 +87,29 @@ class TrafficAnalyzer:
         - If threshold is not exceeded but in last interval an attack was detected resets last computed ewma to 0.
         """
 
-        syn_count = 0
+        syn_count = self.syn_counter.get_value()
+        udp_count = self.udp_counter.get_value()
 
-        with self.syn_counter_lock:
-            syn_count = self.syn_counter
-            self.syn_counter = 0
+        self.syn_counter.compute_volume()
+        self.udp_counter.compute_volume()
 
-        val = self.__g(syn_count)
-        print(val)
+        print("SYN packets (count, volume): " +
+              str(syn_count) + ", " +
+              str(self.syn_counter.get_volume())
+              )
 
-        if val > self.threshold:
-            print("[!] Warning DDoS detected")
-            self.__last_g = 0
-            self.__threshold_exceeded = True
-        else:
-            # not DDoS detected
+        print("UDP packets (count, volume): " +
+              str(udp_count) + ", " +
+              str(self.udp_counter.get_volume())
+              )
 
-            if self.__threshold_exceeded:
-                # DDoS stopped
-                # last check recorded an attack
+        print()
 
-                self.__last_ewma = 0
-                self.__threshold_exceeded = False
+        if self.syn_counter.threshold_exceeded():
+            print("SYN flooding DoS detected!")
+
+        if self.udp_counter.threshold_exceeded():
+            print("UDP flooding DoS detected!")
 
         threading.Timer(self.time_interval, self.__counter_reader).start()
 
@@ -103,13 +125,9 @@ class TrafficAnalyzer:
         syn = 0x02
 
         if pkt.haslayer(TCP) and pkt[TCP].flags & syn:
-            with self.syn_counter_lock:
-                self.syn_counter += 1
-        
-        if pkt.haslayer(UDP):
-            with self.udp_counter_lock:
-                self.udp_counter += 1
-                print("UDP packets: {}".format(self.udp_counter))
+            self.syn_counter.increase()
+        elif pkt.haslayer(UDP):
+            self.udp_counter.increase()
 
     def start(self):
         """
