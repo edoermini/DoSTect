@@ -2,7 +2,7 @@ import argparse
 import os
 import socket
 import netifaces
-from core.traffic import TrafficCatcher
+from core.traffic import TrafficAnalyzer
 
 # Check if the input file has a valid extension
 def is_valid_capture(parser, arg):
@@ -42,14 +42,13 @@ def main():
     # Parse from keyboard
     args = parser.parse_args()
     if args.file is None:
-        stype = 0
         source = str(args.interface)
+        analyzer = TrafficAnalyzer(source, live_capture=True)
     else:
-        stype = 1
         source = str(args.file)
+        analyzer = TrafficAnalyzer(source)
 
-    trafficCatcher = TrafficCatcher(stype, source)
-    trafficCatcher.start()
+    analyzer.start()
     
 
 if __name__ == "__main__":
