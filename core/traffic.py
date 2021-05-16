@@ -152,54 +152,31 @@ class TrafficAnalyzer:
 
         syn = 0x02
         
+        #current time
+        time_now = time.time()
+        #current time minus last computation time
+        diff_time = time_now - self.time_stamp
+
+        #controllo se sono passati almeno 5 secondi (intervallo  di tempo che abbiamo scelto noi) e non più di 10
+        #in tal caso chiamo counter_reader ed incremento il time_stamp (che ricorda quando ho effettuato l'ultimo controllo)
+        if diff_time >= self.time_interval and diff_time < self.time_interval*2:
+            self.__counter_reader()
+            self.time_stamp += self.time_interval
+        #se ne sono passati più di 10 invece: prendo la parte intera del rapporto tra il tempo passato e la durata dell'intervallo (5 sec)
+        #che indica quanti intervalli di tempo ho "perso" dall'ultima invocazione della callback
+        #a questo punto eseguo una counter_reader per ogni intervallo "perso", incrementando il timestamp di 5 ad ogni iterazione
+        elif diff_time > self.time_interval*2:
+            i = int(diff_time/self.time_interval)
+            print(diff_time)
+            print(i)
+            for c in range(i):
+                self.__counter_reader
+                self.time_stamp += self.time_interval
+
         if pkt.haslayer(TCP) and pkt[TCP].flags & syn:
-
-            #current time
-            time_now = time.time()
-            #current time minus last computation time
-            diff_time = time_now - self.time_stamp
-
-            #controllo se sono passati almeno 5 secondi (intervallo  di tempo che abbiamo scelto noi) e non più di 10
-            #in tal caso chiamo counter_reader ed incremento il time_stamp (che ricorda quando ho effettuato l'ultimo controllo)
-            if diff_time >= 5 and diff_time < 10:
-                self.__counter_reader()
-                self.time_stamp += 5
-            #se ne sono passati più di 10 invece: prendo la parte intera del rapporto tra il tempo passato e la durata dell'intervallo (5 sec)
-            #che indica quanti intervalli di tempo ho "perso" dall'ultima invocazione della callback
-            #a questo punto eseguo una counter_reader per ogni intervallo "perso", incrementando il timestamp di 5 ad ogni iterazione
-            elif diff_time > 10:
-                i = int(diff_time/5)
-                print(diff_time)
-                print(i)
-                for c in range(i):
-                    self.__counter_reader
-                    self.time_stamp += 5
-
             self.syn_counter.increase()
             
         elif pkt.haslayer(UDP):
-
-            #current time
-            time_now = time.time()
-            #current time minus last computation time
-            diff_time = time_now - self.time_stamp
-
-            #controllo se sono passati almeno 5 secondi (intervallo  di tempo che abbiamo scelto noi) e non più di 10
-            #in tal caso chiamo counter_reader ed incremento il time_stamp (che ricorda quando ho effettuato l'ultimo controllo)
-            if diff_time >= 5 and diff_time < 10:
-                self.__counter_reader()
-                self.time_stamp += 5
-            #se ne sono passati più di 10 invece: prendo la parte intera del rapporto tra il tempo passato e la durata dell'intervallo (5 sec)
-            #che indica quanti intervalli di tempo ho "perso" dall'ultima invocazione della callback
-            #a questo punto eseguo una counter_reader per ogni intervallo "perso", incrementando il timestamp di 5 ad ogni iterazione
-            elif diff_time > 10:
-                i = int(diff_time/5)
-                print(diff_time)
-                print(i)
-                for c in range(i):
-                    self.__counter_reader
-                    self.time_stamp += 5
-
             self.udp_counter.increase()
 
         
