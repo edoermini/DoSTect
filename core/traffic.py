@@ -1,26 +1,20 @@
 import threading
 from scapy.sendrecv import sniff
 from scapy.layers.inet import TCP, UDP
-import influxdb_client
-from influxdb_client.client.write_api import SYNCHRONOUS
+from datetime import datetime
 import time
 
-#defining variables needed to use influxdb -> bucket, organization, token and url
-bucket = "DoSTect"
-org = "e86e148a11a476b5"
-token = "kiL0rjXvgh8mdrvXZrHvR0bM0i7clEmQBb_vFo8Jxf4WGyPT61dR6Vl2wXB0K82lE82Y9WfExJmYB2_uRFB17Q=="
-# Store the URL of your InfluxDB instance
-url="https://eu-central-1-1.aws.cloud2.influxdata.com/"
 
-#here we initialize a reference to use client side influx
-client = influxdb_client.InfluxDBClient(
-   url=url,
-   token=token,
-   org=org
-)
-
-write_api = client.write_api(write_options=SYNCHRONOUS)
-
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 class Counter:
     def __init__(self, threshold, sigma, alpha, beta):
@@ -65,7 +59,7 @@ class Counter:
 
         # checking violation
         if self.__last_cusum > self.threshold:
-            self.__last_cusum = 0
+            #self.__last_cusum = 0
             self.__threshold_exceeded = True
         else:
             # violation not detected
@@ -85,17 +79,19 @@ class Counter:
         return self.__threshold_exceeded
 
 
+
 class TrafficAnalyzer:
     """
     A thread used for capturing traffic and saving data of interest into DB
     """
-    time_stamp = 0
+    
 
-    def __init__(self, source, live_capture=False, time_interval=5):
+    def __init__(self, source, plot, live_capture=False, time_interval=5):
         self.source = source
         self.live_capture = live_capture
         self.time_interval = time_interval
-
+        self.plot = plot
+        self.time_stamp = 0
         self.syn_counter = Counter(threshold=10, sigma=100, alpha=0.5, beta=0.95)
         self.udp_counter = Counter(threshold=10, sigma=1000, alpha=0.5, beta=0.95)
 
@@ -106,40 +102,35 @@ class TrafficAnalyzer:
         - If threshold is exceeded resets last computed volume to 0.
         - If threshold is not exceeded but in last interval an attack was detected resets last computed ewma to 0.
         """
-
         syn_count = self.syn_counter.get_value()
-        udp_count = self.udp_counter.get_value()
-
         self.syn_counter.compute_volume()
+        ts1 = int(time.time())
+        tcp_volume = float(self.syn_counter.get_volume())
+        self.plot.update_syn_volume(tcp_volume, ts1)
+
+
+        udp_count = self.udp_counter.get_value()
         self.udp_counter.compute_volume()
+        ts2 = int(time.time())
+        udp_volume = float(self.udp_counter.get_volume())
+        self.plot.update_udp_volume(udp_volume,ts2)
 
-        print("SYN packets (count, volume): " +
-              str(syn_count) + ", " +
-              str(self.syn_counter.get_volume())
-              )
 
-        print("UDP packets (count, volume): " +
-              str(udp_count) + ", " +
-              str(self.udp_counter.get_volume())
-              )
-
-        #write volume amount for SYN packets, as table's record on InfluxDB
-        p_syn = influxdb_client.Point("syn_flow").field("volume", self.syn_counter.get_volume())
-        write_api.write(bucket=bucket, org=org, record=p_syn)
-
-        #write volume amount for UDP packets, as table's record InfluxDB
-        p_udp = influxdb_client.Point("udp_flow").field("volume", self.udp_counter.get_volume())
-        write_api.write(bucket=bucket, org=org, record=p_udp)
-
-        print()
-
+        scolor = bcolors.OKBLUE
         if self.syn_counter.threshold_exceeded():
-            print("SYN flooding DoS detected!")
+            print(f"{bcolors.FAIL}SYN flooding DoS detected!{bcolors.ENDC}")
+            scolor = bcolors.WARNING
 
+        ucolor = bcolors.OKBLUE
         if self.udp_counter.threshold_exceeded():
-            print("UDP flooding DoS detected!")
+            print(f"{bcolors.FAIL}UDP flooding DoS detected!{bcolors.ENDC}")
+            ucolor = bcolors.WARNING
 
-        #threading.Timer(self.time_interval, self.__counter_reader).start()
+        print(f"{scolor}SYN packets (count, volume): {str(syn_count)} {str(tcp_volume)} {bcolors.ENDC}")
+        
+        print(f"{ucolor}UDP packets (count, volume): {str(udp_count)} { str(udp_volume)} {bcolors.ENDC}")
+       
+
 
     def __callback(self, pkt):
         """
@@ -151,6 +142,7 @@ class TrafficAnalyzer:
         """
 
         syn = 0x02
+        ack = 0x10
         
         #current time
         time_now = time.time()
@@ -167,8 +159,6 @@ class TrafficAnalyzer:
         #a questo punto eseguo una counter_reader per ogni intervallo "perso", incrementando il timestamp di 5 ad ogni iterazione
         elif diff_time > self.time_interval*2:
             i = int(diff_time/self.time_interval)
-            print(diff_time)
-            print(i)
             for c in range(i):
                 self.__counter_reader
                 self.time_stamp += self.time_interval
