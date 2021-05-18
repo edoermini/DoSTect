@@ -1,6 +1,8 @@
 import threading
 from scapy.sendrecv import sniff
 from scapy.layers.inet import TCP, UDP
+from .forecasting import UDPNPCusum, SYNNPCusum
+import time
 
 
 class Counter:
@@ -72,12 +74,18 @@ class TrafficAnalyzer:
     """
 
     def __init__(self, source, live_capture=False, time_interval=5):
+        self.time_stamp = time.time()
         self.source = source
         self.live_capture = live_capture
         self.time_interval = time_interval
 
-        self.syn_counter = Counter(threshold=10, sigma=100, alpha=0.5, beta=0.95)
-        self.udp_counter = Counter(threshold=10, sigma=1000, alpha=0.5, beta=0.95)
+        self.syn_cusum = SYNNPCusum()
+        self.udp_cusum = UDPNPCusum()
+
+        self.syn_counter = 0
+        self.synack_counter = 0
+
+        self.udp_counter = 0
 
     def __counter_reader(self):
         """
@@ -87,31 +95,12 @@ class TrafficAnalyzer:
         - If threshold is not exceeded but in last interval an attack was detected resets last computed ewma to 0.
         """
 
-        syn_count = self.syn_counter.get_value()
-        udp_count = self.udp_counter.get_value()
+        self.syn_cusum.analyze(self.syn_counter, self.synack_counter)
+        self.udp_cusum.analyze(self.udp_counter)
 
-        self.syn_counter.compute_volume()
-        self.udp_counter.compute_volume()
-
-        print("SYN packets (count, volume): " +
-              str(syn_count) + ", " +
-              str(self.syn_counter.get_volume())
-              )
-
-        print("UDP packets (count, volume): " +
-              str(udp_count) + ", " +
-              str(self.udp_counter.get_volume())
-              )
-
-        print()
-
-        if self.syn_counter.threshold_exceeded():
-            print("SYN flooding DoS detected!")
-
-        if self.udp_counter.threshold_exceeded():
-            print("UDP flooding DoS detected!")
-
-        threading.Timer(self.time_interval, self.__counter_reader).start()
+        self.syn_counter = 0
+        self.synack_counter = 0
+        self.udp_counter = 0
 
     def __callback(self, pkt):
         """
@@ -122,20 +111,41 @@ class TrafficAnalyzer:
         :param pkt: packet read
         """
 
-        syn = 0x02
+        syn = 0x2
+        ack = 0x10
 
-        if pkt.haslayer(TCP) and pkt[TCP].flags & syn:
-            self.syn_counter.increase()
-        elif pkt.haslayer(UDP):
-            self.udp_counter.increase()
+        # current time minus last computation time
+        diff_time = time.time() - self.time_stamp
+
+        # controllo se sono passati almeno 5 secondi (intervallo  di tempo che abbiamo scelto noi) e non più di 10
+        # in tal caso chiamo counter_reader ed incremento il time_stamp (che ricorda quando ho effettuato l'ultimo controllo)
+        if diff_time >= self.time_interval and diff_time < self.time_interval * 2:
+            self.__counter_reader()
+            self.time_stamp += self.time_interval
+        # se ne sono passati più di 10 invece: prendo la parte intera del rapporto tra il tempo passato e la durata dell'intervallo (5 sec)
+        # che indica quanti intervalli di tempo ho "perso" dall'ultima invocazione della callback
+        # a questo punto eseguo una counter_reader per ogni intervallo "perso", incrementando il timestamp di 5 ad ogni iterazione
+        elif diff_time > self.time_interval * 2:
+            i = int(diff_time / self.time_interval)
+            print(diff_time)
+            print(i)
+            for c in range(i):
+                self.__counter_reader()
+                self.time_stamp += self.time_interval
+
+        if pkt.haslayer(TCP):
+            if (pkt[TCP].flags & syn) and not (pkt[TCP].flags & ack):
+                self.syn_counter += 1
+            elif (pkt[TCP].flags & syn) and (pkt[TCP].flags & ack):
+                self.synack_counter += 1
+
+        if pkt.haslayer(UDP):
+            self.udp_counter += 1
 
     def start(self):
         """
         Starts packet capturing and analyzing
         """
-
-        # start thread that runs every time_interval seconds
-        self.__counter_reader()
 
         if self.live_capture:
             sniff(iface=self.source, prn=self.__callback)
