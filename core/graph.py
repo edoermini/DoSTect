@@ -1,13 +1,18 @@
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client.client import write_api
 from influxdb_client.client.influxdb_client import BucketsApi
+from influxdb import SeriesHelper
 from threading import Timer
 import influxdb_client
+from influxdb_client import *
+
 import heapq
 import threading
 import os
 
-class Graph:
+
+class Graph():
+
 
     def __init__(self, time_interval=5.0):
 
@@ -33,9 +38,13 @@ class Graph:
 
         try:
             # Load influx configuration from .ini file
+            #TODO: fix config.ini path
             config_file = os.path.join(os.path.dirname(__file__), 'config.ini')
             client = influxdb_client.InfluxDBClient.from_config_file(config_file)
             
+            # org_api = client.organizations_api()
+            # orgs = org_api.find_organizations()
+                        
             # Retrieve organization
             self.org = client.org
 
@@ -44,8 +53,11 @@ class Graph:
 
             #Check if bucket bucket_name already exists, else create it
             if bucket.find_bucket_by_name(self.bucket_name) is None:
-                bucket.create_bucket(self.bucket_name)
-
+                #new_bucket = influxdb_client.domain.Bucket()
+                #TODO: openAPI error response due to org_id arg -> https://www.gitmemory.com/issue/influxdata/influxdb-client-python/147/677644188
+                bucket.create_bucket(bucket_name=self.bucket_name)
+                
+            
             #Create write API for points creation
             self.write_api = client.write_api(write_options=SYNCHRONOUS)
         except:
@@ -55,48 +67,53 @@ class Graph:
         # Start writing thread
         self._run()
 
-       
-    def write_syn_volume(self):
+
+    def write_syn_data(self):
+
         # Check if there is volume values to write
         if len(self.tcp_queue) != 0:
 
             # Retrieve volume from <timestamp:volume>
-            _, tcp_volume = heapq.heappop(self.tcp_queue)
-
+            timestamp, tcp_data = heapq.heappop(self.tcp_queue)
+            tcp_volume = tcp_data[0]
+            tcp_threshold = tcp_data[1]
+            
             # Create point with value tcp_volume and write it to bucket bucket_name
-            p_syn = influxdb_client.Point("syn_flow").field("volume", float(tcp_volume))
+            p_syn = influxdb_client.Point("syn_flow").field("volume", float(tcp_volume)).field("threshold", float(tcp_threshold))
             self.write_api.write(bucket=self.bucket_name, org=self.org, record=p_syn)
-            print("TCP Volume update: ", tcp_volume)
+            #self.write_api.write(bucket=self.bucket_name, org=self.org, record=t_syn)
+            print("TCP Volume update: " + str(tcp_volume) + " threshold: " + str(tcp_threshold) + " time: " + str(timestamp))
     
 
-    def write_udp_volume(self):
+    def write_udp_data(self):
         # Check if there is volume values to write
         if len(self.udp_queue) != 0:
 
-            # Retrieve volume from <timestamp:volume>
-            _, udp_volume = heapq.heappop(self.udp_queue)
-            print(udp_volume)
+            # Retrieve volume from <timestamp:[volume, threshold]>
+            timestamp, udp_data = heapq.heappop(self.udp_queue)
+            udp_volume = udp_data[0]
+            udp_threshold = udp_data[1]
 
             # Create point with value tcp_volume and write it to bucket bucket_name
-            p_udp = influxdb_client.Point("udp_flow").field("volume", float(udp_volume))
+            p_udp = influxdb_client.Point("udp_flow").field("volume", float(udp_volume)).field("threshold", float(udp_threshold))
             self.write_api.write(bucket=self.bucket_name, org=self.org, record=p_udp)
             print("UDP Volume update: ", udp_volume)
 
-    def update_syn_volume(self, volume, timestamp):
-        # Insert TCP volume into shared priority queue (<timestamp:volume>)
-        heapq.heappush(self.tcp_queue, (timestamp, volume))
+    def update_syn_data(self, data, timestamp, threshold=10):
+        # Insert TCP volume into shared priority queue (<timestamp:[volume, threshold]>)
+        heapq.heappush(self.tcp_queue, (timestamp, data))
        
-    def update_udp_volume(self, volume, timestamp):
-        # Insert UDP volume into shared priority queue (<timestamp:volume>)
-        heapq.heappush(self.udp_queue, (timestamp, volume))
+    def update_udp_data(self, data, timestamp, threshold=10):
+        # Insert UDP volume into shared priority queue (<timestamp:[volume, threshold]>)
+        heapq.heappush(self.udp_queue, (timestamp, data))
         
     def _run(self):
 
         #Run writing point function every self.interval sec
         threading.Timer(self.interval, self._run).start()
 
-        self.write_syn_volume()
-        self.write_udp_volume()
+        self.write_syn_data()
+        self.write_udp_data()
     
 
 

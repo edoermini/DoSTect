@@ -106,14 +106,14 @@ class TrafficAnalyzer:
         self.syn_counter.compute_volume()
         ts1 = int(time.time())
         tcp_volume = float(self.syn_counter.get_volume())
-        self.plot.update_syn_volume(tcp_volume, ts1)
+        self.plot.update_syn_data([tcp_volume,10], ts1)
 
 
         udp_count = self.udp_counter.get_value()
         self.udp_counter.compute_volume()
         ts2 = int(time.time())
         udp_volume = float(self.udp_counter.get_volume())
-        self.plot.update_udp_volume(udp_volume,ts2)
+        self.plot.update_udp_data([udp_volume,10],ts2)
 
 
         scolor = bcolors.OKBLUE
