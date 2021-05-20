@@ -1,72 +1,8 @@
 import threading
 from scapy.sendrecv import sniff
 from scapy.layers.inet import TCP, UDP
-from .forecasting import UDPNPCusum, SYNNPCusum
+from .detectors import UDPNPCusumDetector, SYNNPCusumDetector
 import time
-
-
-class Counter:
-    def __init__(self, threshold, sigma, alpha, beta):
-        self.threshold = threshold
-        self.sigma = sigma
-        self.alpha = alpha
-        self.beta = beta
-
-        self.counter_lock = threading.Lock()
-        self.counter = 0
-
-        self.__last_cusum = 0
-        self.__last_ewma = 0
-
-        self.__threshold_exceeded = False
-
-    def compute_volume(self):
-        """
-        Cumulative sum (CUSUM) implementation. \n
-        Equation:
-            - g_{n} = max( (g_{n-1} + (alpha*mu_{n-1} / sigma^{2}) * (x_{n} - mu_{n-1} - alpha*mu_{n-1}/2) , 0) \n
-            - mu_{n} = beta*mu_{n-1} + (1- beta)*x_{n}
-
-        where x_{n} is the metric (number of SYN packets) at interval n
-        """
-
-        counter = 0
-
-        with self.counter_lock:
-            counter = self.counter
-            self.counter = 0
-
-        # calulating cusum value
-        new_cusum = self.__last_cusum + ((self.alpha * self.__last_ewma) / (self.sigma ** 2)) * (
-                counter - self.__last_ewma - self.alpha * self.__last_ewma / 2)
-
-        self.__last_cusum = max(new_cusum, 0)
-
-        # updating exponentially weighted moving average
-        new_ewma = self.beta * self.__last_ewma + (1 - self.beta) * counter
-        self.__last_ewma = new_ewma
-
-        # checking violation
-        if self.__last_cusum > self.threshold:
-            self.__last_cusum = 0
-            self.__threshold_exceeded = True
-        else:
-            # violation not detected
-            self.__threshold_exceeded = False
-
-    def get_volume(self):
-        return self.__last_cusum
-
-    def increase(self):
-        with self.counter_lock:
-            self.counter += 1
-
-    def get_value(self):
-        return self.counter
-
-    def threshold_exceeded(self):
-        return self.__threshold_exceeded
-
 
 class TrafficAnalyzer:
     """
@@ -79,8 +15,8 @@ class TrafficAnalyzer:
         self.live_capture = live_capture
         self.time_interval = time_interval
 
-        self.syn_cusum = SYNNPCusum()
-        self.udp_cusum = UDPNPCusum()
+        self.syn_cusum = SYNNPCusumDetector()
+        self.udp_cusum = UDPNPCusumDetector()
 
         self.syn_counter = 0
         self.synack_counter = 0
