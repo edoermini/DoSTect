@@ -5,7 +5,7 @@ from influxdb import SeriesHelper
 from threading import Timer
 import influxdb_client
 from influxdb_client import *
-
+import json
 import heapq
 import threading
 import os
@@ -38,32 +38,27 @@ class Graph():
 
         try:
             # Load influx configuration from .ini file
-            #TODO: fix config.ini path
-            config_file = os.path.join(os.path.dirname(__file__), 'config.ini')
-            client = influxdb_client.InfluxDBClient.from_config_file(config_file)
+            conf_file = os.path.join(os.path.dirname(__file__), '../config.ini')
+            client = influxdb_client.InfluxDBClient.from_config_file(config_file=conf_file)
             
-            # org_api = client.organizations_api()
-            # orgs = org_api.find_organizations()
-                        
-            # Retrieve organization
-            self.org = client.org
-
-            # Create buckets API for buckets access
-            bucket = client.buckets_api()
-
-            #Check if bucket bucket_name already exists, else create it
-            if bucket.find_bucket_by_name(self.bucket_name) is None:
-                #new_bucket = influxdb_client.domain.Bucket()
-                #TODO: openAPI error response due to org_id arg -> https://www.gitmemory.com/issue/influxdata/influxdb-client-python/147/677644188
-                bucket.create_bucket(bucket_name=self.bucket_name)
-                
-            
-            #Create write API for points creation
-            self.write_api = client.write_api(write_options=SYNCHRONOUS)
         except:
-            print("Error while connecting to influxdb: check your .ini file!")
+            print("Error while connecting to influxdb instance: check your service or .ini file!")
             exit()
-        
+            
+        self.org = client.org
+
+        # Create buckets API for buckets access
+        bucket = client.buckets_api()
+
+        #Check if bucket bucket_name already exists, else create it
+        if bucket.find_bucket_by_name(self.bucket_name) is None:
+            bucket.create_bucket(bucket_name=self.bucket_name)
+            print("[Graph data] - Bucket " + self.bucket_name + " creato!")
+                    
+        #Create write API for points creation
+        self.write_api = client.write_api(write_options=SYNCHRONOUS)
+  
+
         # Start writing thread
         self._run()
 
@@ -81,7 +76,6 @@ class Graph():
             # Create point with value tcp_volume and write it to bucket bucket_name
             p_syn = influxdb_client.Point("syn_flow").field("volume", float(tcp_volume)).field("threshold", float(tcp_threshold))
             self.write_api.write(bucket=self.bucket_name, org=self.org, record=p_syn)
-            #self.write_api.write(bucket=self.bucket_name, org=self.org, record=t_syn)
             print("TCP Volume update: " + str(tcp_volume) + " threshold: " + str(tcp_threshold) + " time: " + str(timestamp))
     
 
