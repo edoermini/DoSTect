@@ -1,5 +1,5 @@
 import math
-from .forecasting import SingleExponentialSmoothing
+from .forecasting import ExponentialSmoothing, SingleExponentialSmoothing
 
 
 class CusumDetector:
@@ -12,7 +12,7 @@ class CusumDetector:
 
         # the gaussian's variance
         # intuitively indicates how much the new value is important in volume (self._test_statistics) computing
-        self._sigma_square = sigma**2
+        self._sigma_square = sigma ** 2
 
         # percentage beyond which the mean value (self.__mu) can be considered as anomalous behaviour
         self._alpha = alpha
@@ -67,7 +67,14 @@ class NPCusumDetector:
     Non parametric cumulative sum implementation for anomaly detection
     """
 
-    def __init__(self, start_alarm_delay, stop_alarm_delay, window_size=3, ewma_factor=0.98, outlier_threshold=0.65):
+    def __init__(self,
+                 start_alarm_delay,
+                 stop_alarm_delay,
+                 smoothing: ExponentialSmoothing,
+                 window_size: int = 3,
+                 ewma_factor: float = 0.98,
+                 outlier_threshold: float = 0.65
+                 ):
 
         # the volume computed (used to check threshold excess)
         self._test_statistic = 0
@@ -93,6 +100,9 @@ class NPCusumDetector:
         self.__window_size = window_size
         # list of last self.__window_size elements
         self.__window = []
+
+        # smoothing objects that implements the smoothing function
+        self.smoothing = smoothing
 
         # exponentially weighted moving average factor
         self.__ewma_factor = ewma_factor
@@ -159,12 +169,16 @@ class NPCusumDetector:
             self.__window = self.__window[1:]
 
             # calculating mean value
-            self._mu = sum(self.__window) / self.__window_size
+            mean = sum(self.__window) / self.__window_size
+
+            # initializing smoothing function first value
+            self.smoothing.initialize([mean], self.__window)
 
             # calculating simga value
             square_sum = 0
             for val in self.__window:
-                square_sum += (val - self._mu) ** 2
+                square_sum += (val - mean) ** 2
+
             self._sigma = math.sqrt(square_sum / self.__window_size)
 
             self.__start_cusum = True
@@ -178,11 +192,11 @@ class NPCusumDetector:
         window_mean = sum(self.__window) / self.__window_size
 
         # saving previous values of mu and sigma
-        last_mu = self._mu
+        last_mu = self.smoothing.get_smoothed_value()
         last_sigma_square = self._sigma ** 2
 
         # calculating window exponentially weighted moving average
-        self._mu = self.__ewma_factor * last_mu + (1 - self.__ewma_factor) * window_mean
+        self.smoothing.forecast(window_mean)
 
         # calculating simga value
         self._sigma = math.sqrt(
@@ -251,7 +265,7 @@ class NPCusumDetector:
 
 class SYNNPCusumDetector(NPCusumDetector):
     def __init__(self):
-        super(SYNNPCusumDetector, self).__init__(4, 4)
+        super(SYNNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing(), window_size=5)
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0
@@ -274,7 +288,7 @@ class SYNNPCusumDetector(NPCusumDetector):
 
 class UDPNPCusumDetector(NPCusumDetector):
     def __init__(self, mean_window_dim=10):
-        super(UDPNPCusumDetector, self).__init__(4, 4)
+        super(UDPNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing())
 
         self.__mean_window_dim = mean_window_dim
         self.__mean_window = []
@@ -293,7 +307,7 @@ class UDPNPCusumDetector(NPCusumDetector):
             if self.__mean_window_dim > window_len > 0:
                 udp_mean = sum(self.__mean_window) / window_len
 
-            elif window_len == self.__mean_window_dim+1:
+            elif window_len == self.__mean_window_dim + 1:
                 self.__mean_window = self.__mean_window[1:]
                 udp_mean = sum(self.__mean_window) / self.__mean_window_dim
 
@@ -302,7 +316,7 @@ class UDPNPCusumDetector(NPCusumDetector):
 
         print(self.__mean_window)
 
-        distance_from_mean = value - udp_mean*1.2
+        distance_from_mean = value - udp_mean * 1.2
 
         print("Value: ", value)
         print("Mean: ", udp_mean)
