@@ -102,13 +102,10 @@ class NPCusumDetector:
         self.__window = []
 
         # smoothing objects that implements the smoothing function
-        self.smoothing = smoothing
+        self._smoothing = smoothing
 
         # exponentially weighted moving average factor
         self.__ewma_factor = ewma_factor
-
-        # exponentially weighted moving average of values in window
-        self._mu = 0
 
         # variance of values in window
         self._sigma = 0
@@ -168,9 +165,9 @@ class NPCusumDetector:
             self.__window.append(value)
             self.__window = self.__window[1:]
 
-            self.smoothing.initialize(self.__window)
+            self._smoothing.initialize(self.__window)
 
-            mean = self.smoothing.get_smoothed_value()
+            mean = self._smoothing.get_smoothed_value()
 
             # calculating simga value
             square_sum = 0
@@ -190,11 +187,11 @@ class NPCusumDetector:
         window_mean = sum(self.__window) / self.__window_size
 
         # saving previous values of mu and sigma
-        last_mu = self.smoothing.get_smoothed_value()
+        last_mu = self._smoothing.get_smoothed_value()
         last_sigma_square = self._sigma ** 2
 
         # calculating window exponentially weighted moving average
-        self.smoothing.forecast(window_mean)
+        self._smoothing.forecast(window_mean)
 
         # calculating simga value
         self._sigma = math.sqrt(
@@ -263,7 +260,7 @@ class NPCusumDetector:
 
 class SYNNPCusumDetector(NPCusumDetector):
     def __init__(self):
-        super(SYNNPCusumDetector, self).__init__(4, 4, DoubleExponentialSmoothing())
+        super(SYNNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing())
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
@@ -271,13 +268,15 @@ class SYNNPCusumDetector(NPCusumDetector):
         if syn_count != 0:
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
+        syn_value = max(syn_value, 0)
+
         self.update(syn_value)
 
         print("SYN Value: %.10f" % syn_value)
         print("SYN Zeta: " + str(self._z))
         print("SYN Sigma: " + str(self._sigma))
         print("SYN volume: " + str(self._test_statistic))
-        print("SYN Mu: " + str(self._mu))
+        print("SYN Mu: " + str(self._smoothing.get_smoothed_value()))
         print("SYN Threshold: " + str(self._detection_threshold))
         print()
 

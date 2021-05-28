@@ -39,7 +39,7 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
     def __init__(self, initial_smoothed_value=0):
 
         self.__bounds = (
-            (0.95, 1),  # smoothing factor value bounds
+            (0.95, 0.99),  # smoothing factor value bounds
         )
 
         self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
@@ -98,7 +98,7 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
     def __init__(self, initial_smoothed_value=0, initial_trend_value=0):
 
         self.__bounds = (
-            (0.95, 1),  # smoothing factor value bounds
+            (0.95, 0.99),  # smoothing factor value bounds
             (0, 1)      # trend factor value bounds
         )
 
@@ -180,4 +180,4 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
         self.__trend_value = self.__trend_factor * (self.__smoothed_value - last_smoothed_value) + \
                              (1 - self.__trend_factor) * self.__trend_value
 
-        return self.__smoothed_value
+        return self.__smoothed_value + self.__trend_value
