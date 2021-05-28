@@ -1,5 +1,5 @@
 import math
-from .forecasting import ExponentialSmoothing, SingleExponentialSmoothing
+from .forecasting import ExponentialSmoothing, SingleExponentialSmoothing, DoubleExponentialSmoothing
 
 
 class CusumDetector:
@@ -172,7 +172,11 @@ class NPCusumDetector:
             mean = sum(self.__window) / self.__window_size
 
             # initializing smoothing function first value
-            self.smoothing.initialize([mean], self.__window)
+            smoothing_init_values = [
+                mean,                                                           # initial value for ewma computation
+                (self.__window[-1] - self.__window[0]) / self.__window_size-1,  # initial value for trend computation
+            ]
+            self.smoothing.initialize(smoothing_init_values, self.__window)
 
             # calculating simga value
             square_sum = 0
@@ -265,7 +269,7 @@ class NPCusumDetector:
 
 class SYNNPCusumDetector(NPCusumDetector):
     def __init__(self):
-        super(SYNNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing())
+        super(SYNNPCusumDetector, self).__init__(4, 4, DoubleExponentialSmoothing())
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
