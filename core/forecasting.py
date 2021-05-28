@@ -6,12 +6,11 @@ import numpy as np
 
 class ExponentialSmoothing:
 
-    def initialize(self, init_values: list, training_values: list):
+    def initialize(self, training_values: list):
         """
         Initializes smoothed value to given value for next iterations.
 
         :param training_values: the values used to estimate forecasting factors
-        :param init_values: the list of init values
         """
 
         pass
@@ -64,8 +63,10 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
         except OverflowError:
             return sys.float_info.max
 
-    def initialize(self, init_values: list, training_values):
-        self.__smoothed_value = init_values[0]
+    def initialize(self, training_values):
+
+        # initializing smoothed value
+        self.__smoothed_value = sum(training_values) / len(training_values)
 
         forecasting_factors_init_guess = np.array([self.__smoothing_factor])
 
@@ -75,7 +76,7 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
         forecasting_factors = optimize.minimize(
             loss_function,
             forecasting_factors_init_guess,
-            method="TNC",
+            method="SLSQP",
             bounds=self.__bounds
         )
 
@@ -125,17 +126,19 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
         except OverflowError:
             return sys.float_info.max
 
-    def initialize(self, init_values: list, training_values: list):
+    def initialize(self, training_values: list):
         """
         Initializes smoothed value to given value for next iterations.
 
         :param training_values: the values used to estimate forecasting factors
-        :param init_values: the list of init values where values[0] is the initial smoothed value
         and values[1] is the initial trend value
         """
 
-        self.__smoothed_value = init_values[0]
-        self.__trend_value = init_values[1]
+        # initializing smoothed value
+        self.__smoothed_value = sum(training_values) / len(training_values)
+
+        # initializing trend value
+        self.__trend_value = (training_values[-1] - training_values[0]) / (len(training_values)-1)
 
         forecasting_factors_init_guess = np.array([self.__smoothing_factor, self.__trend_factor])
 
@@ -150,6 +153,9 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
 
         self.__smoothing_factor = forecasting_factors.x[0]
         self.__trend_factor = forecasting_factors.x[1]
+
+        print("Smoothing factor: ", self.__smoothing_factor)
+        print("Trend factor: ", self.__trend_factor)
 
     def get_smoothed_value(self) -> float:
         """
@@ -174,4 +180,4 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
         self.__trend_value = self.__trend_factor * (self.__smoothed_value - last_smoothed_value) + \
                              (1 - self.__trend_factor) * self.__trend_value
 
-        return self.__smoothed_value + self.__trend_value
+        return self.__smoothed_value

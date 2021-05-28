@@ -168,15 +168,9 @@ class NPCusumDetector:
             self.__window.append(value)
             self.__window = self.__window[1:]
 
-            # calculating mean value
-            mean = sum(self.__window) / self.__window_size
+            self.smoothing.initialize(self.__window)
 
-            # initializing smoothing function first value
-            smoothing_init_values = [
-                mean,                                                           # initial value for ewma computation
-                (self.__window[-1] - self.__window[0]) / self.__window_size-1,  # initial value for trend computation
-            ]
-            self.smoothing.initialize(smoothing_init_values, self.__window)
+            mean = self.smoothing.get_smoothed_value()
 
             # calculating simga value
             square_sum = 0
