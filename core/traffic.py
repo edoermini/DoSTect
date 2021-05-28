@@ -32,7 +32,7 @@ class TrafficAnalyzer:
         """
 
         self.syn_cusum.analyze(self.syn_counter, self.synack_counter)
-        self.udp_cusum.analyze(self.udp_counter)
+        #self.udp_cusum.analyze(self.udp_counter)
 
         self.syn_counter = 0
         self.synack_counter = 0

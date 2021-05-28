@@ -38,15 +38,18 @@ class ExponentialSmoothing:
 class SingleExponentialSmoothing(ExponentialSmoothing):
 
     def __init__(self, initial_smoothed_value=0):
-        self.__smoothing_factor = random.random()
+
+        self.__bounds = (
+            (0.95, 1),  # smoothing factor value bounds
+        )
+
+        self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
 
         self.__smoothed_value = initial_smoothed_value
 
     def __sse(self, values, smoothing_factor):
 
         self.__smoothing_factor = smoothing_factor
-
-        print("SSE: ", self.__smoothing_factor)
 
         predictions = [values[0]]
 
@@ -66,14 +69,14 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
 
         forecasting_factors_init_guess = np.array([self.__smoothing_factor])
 
-        bounds = ((0, 1),)
-        loss_function = lambda x: self.__sse(init_values, x[0])
+        print("Training values: ", training_values)
+        loss_function = lambda x: self.__sse(training_values, x[0])
 
         forecasting_factors = optimize.minimize(
             loss_function,
             forecasting_factors_init_guess,
-            method="SLSQP",
-            bounds=bounds
+            method="TNC",
+            bounds=self.__bounds
         )
 
         self.__smoothing_factor = forecasting_factors.x[0]
@@ -92,8 +95,14 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
 class DoubleExponentialSmoothing(ExponentialSmoothing):
 
     def __init__(self, initial_smoothed_value=0, initial_trend_value=0):
-        self.__smoothing_factor = random.random()
-        self.__trend_factor = random.random()
+
+        self.__bounds = (
+            (0.95, 1),  # smoothing factor value bounds
+            (0, 1)      # trend factor value bounds
+        )
+
+        self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
+        self.__trend_factor = random.uniform(self.__bounds[1][0], self.__bounds[1][1])
 
         self.__smoothed_value = initial_smoothed_value
         self.__trend_value = initial_trend_value
@@ -130,14 +139,13 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
 
         forecasting_factors_init_guess = np.array([self.__smoothing_factor, self.__trend_factor])
 
-        bounds = ((0, 1), (0, 1))
-        loss_function = lambda x: self.__sse(init_values, x[0], x[1])
+        loss_function = lambda x: self.__sse(training_values, x[0], x[1])
 
         forecasting_factors = optimize.minimize(
             loss_function,
             forecasting_factors_init_guess,
             method="SLSQP",
-            bounds=bounds
+            bounds=self.__bounds
         )
 
         self.__smoothing_factor = forecasting_factors.x[0]

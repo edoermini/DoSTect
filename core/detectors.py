@@ -265,17 +265,17 @@ class NPCusumDetector:
 
 class SYNNPCusumDetector(NPCusumDetector):
     def __init__(self):
-        super(SYNNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing(), window_size=5)
+        super(SYNNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing())
 
     def analyze(self, syn_count: int, synack_count: int):
-        syn_value = 0
+        syn_value = 0.0
 
         if syn_count != 0:
-            syn_value = (syn_count - synack_count) / syn_count
+            syn_value = float(syn_count - synack_count) / float(syn_count)
 
         self.update(syn_value)
 
-        print("SYN Value: %f" % syn_value)
+        print("SYN Value: %.10f" % syn_value)
         print("SYN Zeta: " + str(self._z))
         print("SYN Sigma: " + str(self._sigma))
         print("SYN volume: " + str(self._test_statistic))
@@ -288,15 +288,14 @@ class SYNNPCusumDetector(NPCusumDetector):
 
 class UDPNPCusumDetector(NPCusumDetector):
     def __init__(self, mean_window_dim=10):
-        super(UDPNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing())
+        super(UDPNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing(), window_size=3)
 
         self.__mean_window_dim = mean_window_dim
         self.__mean_window = []
 
     def analyze(self, value: int):
-        udp_value = 0
-        udp_mean = 0
-        udp_variance = 0
+        udp_value = 0.0
+        udp_mean = 0.0
 
         if not self._under_attack:
             # updating udp mean factor
@@ -304,7 +303,7 @@ class UDPNPCusumDetector(NPCusumDetector):
 
             window_len = len(self.__mean_window)
 
-            if self.__mean_window_dim > window_len > 0:
+            if self.__mean_window_dim >= window_len > 0:
                 udp_mean = sum(self.__mean_window) / window_len
 
             elif window_len == self.__mean_window_dim + 1:
@@ -316,19 +315,18 @@ class UDPNPCusumDetector(NPCusumDetector):
 
         print(self.__mean_window)
 
-        distance_from_mean = value - udp_mean * 1.2
+        distance_from_mean = float(value) - udp_mean * 1.2
 
         print("Value: ", value)
         print("Mean: ", udp_mean)
-        print("Variance: ", udp_variance)
         print("Distance from mean: ", distance_from_mean)
 
         if value != 0 and distance_from_mean > 0:
-            udp_value = distance_from_mean / value
+            udp_value = distance_from_mean / float(value)
 
         self.update(udp_value)
 
-        print("UDP Value: %f" % udp_value)
+        print("UDP Value: %.10f" % udp_value)
         print("UDP Zeta: " + str(self._z))
         print("UDP Sigma: " + str(self._sigma))
         print("UDP volume: " + str(self._test_statistic))
