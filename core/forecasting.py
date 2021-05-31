@@ -89,7 +89,7 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
             bounds=self.__bounds
         )
 
-        self.__smoothing_factor = 0.98#forecasting_factors.x[0]
+        self.__smoothing_factor = forecasting_factors.x[0]
 
         print("Final smoothing factor: ", self.__smoothing_factor)
 
