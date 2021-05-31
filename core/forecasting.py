@@ -22,6 +22,13 @@ class ExponentialSmoothing:
 
         pass
 
+    def get_smoothing_factor(self) -> float:
+        """
+        Returns the estimated smoothing factor
+        """
+
+        pass
+
     def forecast(self, value: float) -> float:
         """
         Applies exponential smoothing algorithm
@@ -59,7 +66,9 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
             s = 0
             for n, r in zip(values, predictions):
                 s = s + (n - r) ** 2
+
             return s
+        
         except OverflowError:
             return sys.float_info.max
 
@@ -80,12 +89,15 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
             bounds=self.__bounds
         )
 
-        self.__smoothing_factor = forecasting_factors.x[0]
+        self.__smoothing_factor = 0.98#forecasting_factors.x[0]
 
         print("Final smoothing factor: ", self.__smoothing_factor)
 
     def get_smoothed_value(self) -> float:
         return self.__smoothed_value
+
+    def get_smoothing_factor(self) -> float:
+        return self.__smoothing_factor
 
     def forecast(self, value: float) -> float:
         self.__smoothed_value = self.__smoothing_factor * self.__smoothed_value + (1 - self.__smoothing_factor) * value

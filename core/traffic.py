@@ -1,15 +1,16 @@
 import threading
 from scapy.sendrecv import sniff
-from scapy.layers.inet import TCP, UDP
+from scapy.layers.inet import TCP, UDP, IP
 from .detectors import UDPNPCusumDetector, SYNNPCusumDetector
 import time
+import netifaces as ni
 
 class TrafficAnalyzer:
     """
     A thread used for capturing traffic and saving data of interest into DB
     """
 
-    def __init__(self, source, live_capture=False, time_interval=5):
+    def __init__(self, source, live_capture=False, time_interval=20):
         self.time_stamp = time.time()
         self.source = source
         self.live_capture = live_capture
@@ -69,10 +70,12 @@ class TrafficAnalyzer:
                 self.__counter_reader()
                 self.time_stamp += self.time_interval
 
+        local_addr = ni.ifaddresses(self.source)[ni.AF_INET][0]['addr']
+
         if pkt.haslayer(TCP):
-            if (pkt[TCP].flags & syn) and not (pkt[TCP].flags & ack):
+            if (pkt[TCP].flags & syn) and not (pkt[TCP].flags & ack) and (pkt[IP].dst == local_addr):
                 self.syn_counter += 1
-            elif (pkt[TCP].flags & syn) and (pkt[TCP].flags & ack):
+            elif (pkt[TCP].flags & syn) and (pkt[TCP].flags & ack) and (pkt[IP].src == local_addr):
                 self.synack_counter += 1
 
         if pkt.haslayer(UDP):
@@ -84,6 +87,6 @@ class TrafficAnalyzer:
         """
 
         if self.live_capture:
-            sniff(iface=self.source, prn=self.__callback)
+            sniff(iface=self.source, prn=self.__callback, store=0)
         else:
-            sniff(offline=self.source, prn=self.__callback)
+            sniff(offline=self.source, prn=self.__callback, store=0)

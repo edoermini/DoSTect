@@ -68,11 +68,10 @@ class NPCusumDetector:
     """
 
     def __init__(self,
-                 start_alarm_delay,
-                 stop_alarm_delay,
-                 smoothing: ExponentialSmoothing,
-                 window_size: int = 3,
-                 ewma_factor: float = 0.98,
+                 start_alarm_delay: int,
+                 stop_alarm_delay: int,
+                 smoothing: ExponentialSmoothing = SingleExponentialSmoothing,
+                 window_size: int = 5,
                  outlier_threshold: float = 0.65
                  ):
 
@@ -103,9 +102,6 @@ class NPCusumDetector:
 
         # smoothing objects that implements the smoothing function
         self._smoothing = smoothing
-
-        # exponentially weighted moving average factor
-        self.__ewma_factor = ewma_factor
 
         # variance of values in window
         self._sigma = 0
@@ -186,6 +182,8 @@ class NPCusumDetector:
         # calculating window mean
         window_mean = sum(self.__window) / self.__window_size
 
+        print(window_mean)
+
         # saving previous values of mu and sigma
         last_mu = self._smoothing.get_smoothed_value()
         last_sigma_square = self._sigma ** 2
@@ -193,10 +191,12 @@ class NPCusumDetector:
         # calculating window exponentially weighted moving average
         self._smoothing.forecast(window_mean)
 
+        smoothing_factor = self._smoothing.get_smoothing_factor()
+
         # calculating simga value
         self._sigma = math.sqrt(
-            self.__ewma_factor * last_sigma_square +
-            (1 - self.__ewma_factor) * (window_mean - last_mu) ** 2
+            smoothing_factor * last_sigma_square +
+            (1 - smoothing_factor) * (window_mean - last_mu) ** 2
         )
 
         self._z = window_mean - last_mu - 3 * last_sigma_square
@@ -206,9 +206,9 @@ class NPCusumDetector:
         if not self.__start_cusum:
             return
 
-        self._test_statistic = max(self._test_statistic + self._z, 0)
-
         if not self._under_attack:
+
+            self._test_statistic = max(self._test_statistic + self._z, 0)
 
             if self._z > 0:
                 # adjusting detection threshold
@@ -267,8 +267,6 @@ class SYNNPCusumDetector(NPCusumDetector):
 
         if syn_count != 0:
             syn_value = float(syn_count - synack_count) / float(syn_count)
-
-        syn_value = max(syn_value, 0)
 
         self.update(syn_value)
 
