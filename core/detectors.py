@@ -1,6 +1,16 @@
 import math
 from .forecasting import ExponentialSmoothing, SingleExponentialSmoothing, DoubleExponentialSmoothing
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 class CusumDetector:
     """
@@ -132,7 +142,7 @@ class NPCusumDetector:
                 if self.__outlier_cum == self.__start_alarm_delay:
                     # reached required times to detect an attack
 
-                    print("DoS attack detected")
+                    print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
                     self.__outlier_cum = self.__start_alarm_delay - 1
                     self._under_attack = True
                     self.__alarm_dur += 1
@@ -203,6 +213,9 @@ class NPCusumDetector:
 
     def _cusum_detection(self):
 
+        delta = 0
+        k_d = 0
+
         if not self.__start_cusum:
             return
 
@@ -222,7 +235,7 @@ class NPCusumDetector:
                 if self._test_statistic >= self._detection_threshold:
                     # under attack
 
-                    print("DoS attack detected")
+                    print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
                     self._under_attack = True
                     self.__alarm_dur += 1
             else:
@@ -238,7 +251,7 @@ class NPCusumDetector:
                 if self.__attack_ending_cum == self.__stop_alarm_delay:
                     # reached required time delay before detect an attack ending
 
-                    print("DoS ended")
+                    print(f"{bcolors.OKGREEN}DoS ended{bcolors.ENDC}")
                     self._under_attack = False
                     self._test_statistic = 0
                     self.__attack_ending_cum = 0
@@ -248,7 +261,33 @@ class NPCusumDetector:
                         self.__alarm_dur = 0
                 else:
                     # continuing to raise alarm
+                   
+                    # Abrupt drecrease
+                    
+                    mu_i = self._smoothing.get_smoothed_value()
+
+                    if self.__attack_ending_cum > 0:
+                        self.__attack_ending_cum -= 1
+                    
                     self.__alarm_dur += 1
+                    
+                    if self.__alarm_dur >= 6:
+                        if delta == 0:
+                            delta = self._test_statistic
+                        else:
+                            if (delta - self._test_statistic) >= (delta-mu_i)/2:
+                                k_d += 1
+                                if k_d == self.__stop_alarm_delay:
+                                    self._under_attack = False
+                                    k_d = 0
+                                    delta = 0
+                            else:
+                                smoothing_factor = self._smoothing.get_smoothing_factor()
+                                delta = smoothing_factor * delta + (1 - smoothing_factor) * self._test_statistic
+                                if k_d > 0:
+                                    k_d -= 1
+                    
+
 
     def update(self, value: float):
         self._outlier_processing(value)
@@ -269,13 +308,13 @@ class SYNNPCusumDetector(NPCusumDetector):
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
         self.update(syn_value)
-
-        print("SYN Value: %.10f" % syn_value)
-        print("SYN Zeta: " + str(self._z))
-        print("SYN Sigma: " + str(self._sigma))
-        print("SYN volume: " + str(self._test_statistic))
-        print("SYN Mu: " + str(self._smoothing.get_smoothed_value()))
-        print("SYN Threshold: " + str(self._detection_threshold))
+        #print(f"{bcolors.OKBLUE}DoS attack detected{bcolors.ENDC}")
+        print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
+        print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
+        print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
+        print(f"{bcolors.OKCYAN}SYN volume: {bcolors.ENDC}" + str(self._test_statistic))
+        print(f"{bcolors.OKCYAN}SYN Mu: {bcolors.ENDC}" + str(self._smoothing.get_smoothed_value()))
+        print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
         print()
 
         return self._test_statistic

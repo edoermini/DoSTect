@@ -10,7 +10,7 @@ class TrafficAnalyzer:
     A thread used for capturing traffic and saving data of interest into DB
     """
 
-    def __init__(self, source, live_capture=False, time_interval=20):
+    def __init__(self, source, live_capture=False, time_interval=5):
         self.time_stamp = time.time()
         self.source = source
         self.live_capture = live_capture
