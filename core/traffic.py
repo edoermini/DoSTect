@@ -11,18 +11,15 @@ class TrafficAnalyzer:
     """
 
     def __init__(self, source, live_capture=False, time_interval=5):
-        self.time_stamp = time.time()
-        self.source = source
-        self.live_capture = live_capture
-        self.time_interval = time_interval
+        self.__timestamp = time.time()
+        self.__source = source
+        self.__live_capture = live_capture
+        self.__time_interval = time_interval
 
-        self.syn_cusum = SYNNPCusumDetector()
-        self.udp_cusum = UDPNPCusumDetector()
+        self.__syn_cusum = SYNNPCusumDetector()
 
-        self.syn_counter = 0
-        self.synack_counter = 0
-
-        self.udp_counter = 0
+        self.__syn_counter = 0
+        self.__synack_counter = 0
 
     def __counter_reader(self):
         """
@@ -32,12 +29,10 @@ class TrafficAnalyzer:
         - If threshold is not exceeded but in last interval an attack was detected resets last computed ewma to 0.
         """
 
-        self.syn_cusum.analyze(self.syn_counter, self.synack_counter)
-        #self.udp_cusum.analyze(self.udp_counter)
+        self.__syn_cusum.analyze(self.__syn_counter, self.__synack_counter)
 
-        self.syn_counter = 0
-        self.synack_counter = 0
-        self.udp_counter = 0
+        self.__syn_counter = 0
+        self.__synack_counter = 0
 
     def __callback(self, pkt):
         """
@@ -52,41 +47,38 @@ class TrafficAnalyzer:
         ack = 0x10
 
         # current time minus last computation time
-        diff_time = time.time() - self.time_stamp
+        diff_time = time.time() - self.__timestamp
 
-        # controllo se sono passati almeno 5 secondi (intervallo  di tempo che abbiamo scelto noi) e non più di 10
-        # in tal caso chiamo counter_reader ed incremento il time_stamp (che ricorda quando ho effettuato l'ultimo controllo)
-        if diff_time >= self.time_interval and diff_time < self.time_interval * 2:
+        # checks if it's been at least self.__time_interval seconds and not more than self.__time_interval*2
+        if self.__time_interval <= diff_time < self.__time_interval * 2:
             self.__counter_reader()
-            self.time_stamp += self.time_interval
-        # se ne sono passati più di 10 invece: prendo la parte intera del rapporto tra il tempo passato e la durata dell'intervallo (5 sec)
-        # che indica quanti intervalli di tempo ho "perso" dall'ultima invocazione della callback
-        # a questo punto eseguo una counter_reader per ogni intervallo "perso", incrementando il timestamp di 5 ad ogni iterazione
-        elif diff_time > self.time_interval * 2:
-            i = int(diff_time / self.time_interval)
-            print(diff_time)
-            print(i)
-            for c in range(i):
-                self.__counter_reader()
-                self.time_stamp += self.time_interval
+            self.__timestamp += self.__time_interval
 
-        local_addr = ni.ifaddresses(self.source)[ni.AF_INET][0]['addr']
+        # if it's been more than self.__time_interval*2 seconds:
+        elif diff_time > self.__time_interval * 2:
+
+            # number of lost intervals
+            lost_intervals_number = int(diff_time / self.__time_interval)
+
+            # for each lost interval will be called self.__counter_reader()
+            for c in range(lost_intervals_number):
+                self.__counter_reader()
+                self.__timestamp += self.__time_interval
+
+        local_addr = ni.ifaddresses(self.__source)[ni.AF_INET][0]['addr']
 
         if pkt.haslayer(TCP):
             if (pkt[TCP].flags & syn) and not (pkt[TCP].flags & ack) and (pkt[IP].dst == local_addr):
-                self.syn_counter += 1
+                self.__syn_counter += 1
             elif (pkt[TCP].flags & syn) and (pkt[TCP].flags & ack) and (pkt[IP].src == local_addr):
-                self.synack_counter += 1
-
-        if pkt.haslayer(UDP):
-            self.udp_counter += 1
+                self.__synack_counter += 1
 
     def start(self):
         """
         Starts packet capturing and analyzing
         """
 
-        if self.live_capture:
-            sniff(iface=self.source, prn=self.__callback, store=0)
+        if self.__live_capture:
+            sniff(iface=self.__source, prn=self.__callback, store=0)
         else:
-            sniff(offline=self.source, prn=self.__callback, store=0)
+            sniff(offline=self.__source, prn=self.__callback, store=0)

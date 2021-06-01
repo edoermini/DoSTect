@@ -176,6 +176,9 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
 
         return self.__smoothed_value + self.__trend_value
 
+    def get_smoothing_factor(self) -> float:
+        return self.__smoothing_factor
+
     def forecast(self, value: float) -> float:
         """
         Applies exponential smoothing algorithm
