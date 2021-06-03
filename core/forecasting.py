@@ -40,16 +40,26 @@ class ExponentialSmoothing:
 
         pass
 
+    def forecast_for(self, intervals: int) -> list:
+        """
+        Forecasts for specified number of intervals without changing internal state
+
+        :param intervals: number of intervals to forecast
+        :return: list containing the forecasted values
+        """
+
+        pass
+
 
 class SingleExponentialSmoothing(ExponentialSmoothing):
 
-    def __init__(self, initial_smoothed_value=0):
+    def __init__(self, initial_smoothed_value=0, smoothing_factor=0):
 
         self.__bounds = (
             (0.95, 0.99),  # smoothing factor value bounds
         )
 
-        self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
+        self.__smoothing_factor = smoothing_factor
 
         self.__smoothed_value = initial_smoothed_value
 
@@ -73,6 +83,8 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
             return sys.float_info.max
 
     def initialize(self, training_values):
+
+        self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
 
         # initializing smoothed value
         self.__smoothed_value = sum(training_values) / len(training_values)
@@ -104,18 +116,28 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
 
         return self.__smoothed_value
 
+    def forecast_for(self, intervals: int) -> list:
+        smoothing = SingleExponentialSmoothing(self.__smoothed_value, self.__smoothing_factor)
+
+        forecasted_values = [smoothing.forecast(self.__smoothed_value)]
+
+        for i in range(intervals-1):
+            forecasted_values.append(smoothing.forecast(forecasted_values[-1]))
+
+        return forecasted_values
+
 
 class DoubleExponentialSmoothing(ExponentialSmoothing):
 
-    def __init__(self, initial_smoothed_value=0, initial_trend_value=0):
+    def __init__(self, initial_smoothed_value=0, initial_trend_value=0, smoothing_factor=0, trend_factor=0):
 
         self.__bounds = (
             (0.95, 0.99),  # smoothing factor value bounds
             (0, 1)      # trend factor value bounds
         )
 
-        self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
-        self.__trend_factor = random.uniform(self.__bounds[1][0], self.__bounds[1][1])
+        self.__smoothing_factor = smoothing_factor
+        self.__trend_factor = trend_factor
 
         self.__smoothed_value = initial_smoothed_value
         self.__trend_value = initial_trend_value
@@ -145,6 +167,9 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
         :param training_values: the values used to estimate forecasting factors
         and values[1] is the initial trend value
         """
+
+        self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
+        self.__trend_factor = random.uniform(self.__bounds[1][0], self.__bounds[1][1])
 
         # initializing smoothed value
         self.__smoothed_value = sum(training_values) / len(training_values)
@@ -196,3 +221,18 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
                              (1 - self.__trend_factor) * self.__trend_value
 
         return self.__smoothed_value + self.__trend_value
+
+    def forecast_for(self, intervals: int) -> list:
+        smoothing = DoubleExponentialSmoothing(
+            self.__smoothed_value,
+            self.__trend_value,
+            self.__smoothing_factor,
+            self.__trend_factor
+        )
+
+        forecasted_values = [smoothing.forecast(self.__smoothed_value+self.__trend_value)]
+
+        for i in range(intervals-1):
+            forecasted_values.append(smoothing.forecast(forecasted_values[-1]))
+
+        return forecasted_values

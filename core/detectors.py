@@ -1,6 +1,7 @@
 import math
 from .forecasting import ExponentialSmoothing, SingleExponentialSmoothing, DoubleExponentialSmoothing
 
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -11,6 +12,7 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
 
 class CusumDetector:
     """
@@ -78,10 +80,9 @@ class NPCusumDetector:
     """
 
     def __init__(self,
-                 start_alarm_delay: int,
-                 stop_alarm_delay: int,
-                 smoothing: ExponentialSmoothing = SingleExponentialSmoothing,
-                 window_size: int = 5,
+                 start_alarm_delay: int = 4,
+                 stop_alarm_delay: int = 4,
+                 window_size: int = 3,
                  outlier_threshold: float = 0.65
                  ):
 
@@ -99,9 +100,6 @@ class NPCusumDetector:
         # accumulates the threshold violations
         self.__outlier_cum = 0
 
-        # accumulates the alarming time
-        self.__alarm_dur = 0
-
         # time delay required for identifying the starting of an attack
         self.__start_alarm_delay = start_alarm_delay
 
@@ -111,7 +109,7 @@ class NPCusumDetector:
         self.__window = []
 
         # smoothing objects that implements the smoothing function
-        self._smoothing = smoothing
+        self._smoothing = SingleExponentialSmoothing()
 
         # variance of values in window
         self._sigma = 0
@@ -121,6 +119,22 @@ class NPCusumDetector:
 
         # value used to calculate the test statistic
         self._z = 0
+
+        # smoothing function for forecasting z values under attack
+        self.__z_smoothing = DoubleExponentialSmoothing()
+
+        # smoothing function for forecasting ewma values under attack
+        self.__mu_smoothing = DoubleExponentialSmoothing()
+
+        # saves last self.__stop_alarm_delay self._z values
+        self.__z_values = []
+
+        # saves last self.__stop_alarm_delay smoothed values
+        self.__mu_values = []
+
+        self.__start_ending_forecasting = False
+
+        self.__start_abrupt_decrease_check = False
 
         # time delay required for identifying the ending of an attack
         self.__stop_alarm_delay = stop_alarm_delay
@@ -150,6 +164,7 @@ class NPCusumDetector:
 
                     print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
                     self.__outlier_cum -= 1
+                    self.__z_values.append(self._z)
                     self._under_attack = True
         else:
             # value is not an outlier
@@ -234,7 +249,7 @@ class NPCusumDetector:
 
                     print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
                     self._under_attack = True
-                    self.__alarm_dur += 1
+                    self.__z_values.append(self._z)
             else:
                 # not under attack and not necessity of threshold adjustment
                 return
@@ -242,75 +257,102 @@ class NPCusumDetector:
             # under attack
             # checking end of an attack throughout sign of self.__z
 
-            self.__alarm_dur += 1
+            next_z_values = []
+            next_mu_values = []
 
-            if self._z <= 0:
-                self.__attack_ending_cum += 1
+            if not self.__start_ending_forecasting:
+                # updating self.__z_values
 
-                if self.__attack_ending_cum == self.__stop_alarm_delay:
-                    # reached required time delay before detect an attack ending
+                if len(self.__z_values) < self.__stop_alarm_delay:
+                    self.__z_values.append(self._z)
+                    self.__mu_values.append(self._smoothing.get_smoothed_value())
+                elif len(self.__z_values) == self.__stop_alarm_delay:
+                    self.__z_smoothing.initialize(self.__z_values)
+                    self.__mu_smoothing.initialize(self.__mu_values)
+                    self.__z_values = []
+                    self.__mu_values = []
+                    self.__start_ending_forecasting = True
+            else:
+                self.__z_smoothing.forecast(self._z)
+                self.__mu_smoothing.forecast(self._smoothing.get_smoothed_value())
 
-                    print(f"{bcolors.OKGREEN}DoS ended{bcolors.ENDC}")
-                    self._under_attack = False
-                    self._test_statistic = 0
-                    self.__attack_ending_cum = 0
-                    self._detection_threshold = 0
-                    self.__alarm_dur = 0
-                   
-                # Abrupt drecrease
+                next_z_values = self.__z_smoothing.forecast_for(self.__stop_alarm_delay)
+                next_mu_values = self.__mu_smoothing.forecast_for(self.__stop_alarm_delay)
 
-                last_mu = self._smoothing.get_smoothed_value()
-                last_val = self.__window[-1]
+                print("next_z_values: ", next_z_values)
+                print("next_mu_values: ", next_mu_values)
 
-                if self.__alarm_dur >= 25:
-                    # after 6 intervals of detection we consider self.__z as under estimated
+                if all(i < j for i, j in zip(next_mu_values, next_mu_values[1:])):
+                    # next values are all increasing (attack won't be stopped)
 
-                    # discarding self.__z negativity check
-                    if self.__attack_ending_cum > 0:
-                        self.__attack_ending_cum -= 1
+                    if any(n < 0 for n in next_z_values):
+                        # z will be underestimated in next intervals
+                        self.__start_abrupt_decrease_check = True
 
-                    # checking abrupt decrease of new values
-                    if self.__delta == 0:
-                        self.__delta = last_val
-                    else:
-                        if (self.__delta - last_val) >= (self.__delta-last_mu)/2:
-                            # got abrupt decrease
+                if not self.__start_abrupt_decrease_check:
+                    print("using z for ending check")
+                    self.__check_ending_with_z()
+                else:
+                    print("using abrupt decrease check for ending check")
+                    self.__check_abrupt_decrease()
 
-                            self.__abrupt_decrease_cum += 1
+    def __check_ending_with_z(self):
+        if self._z <= 0:
+            self.__attack_ending_cum += 1
 
-                            if self.__abrupt_decrease_cum == self.__stop_alarm_delay:
-                                # detected end of attack
+            if self.__attack_ending_cum == self.__stop_alarm_delay:
+                # reached required time delay before detect an attack ending
 
-                                print(f"{bcolors.OKGREEN}DoS ended{bcolors.ENDC}")
-                                self._under_attack = False
-                                self.__abrupt_decrease_cum = 0
-                                self.__delta = 0
-                                self._test_statistic = 0
-                                self.__attack_ending_cum = 0
-                                self._detection_threshold = 0
-                                self.__alarm_dur = 0
-                        else:
-                            # updating self.__delta with exponentially weighted moving average method
+                self.__clear()
 
-                            smoothing_factor = self._smoothing.get_smoothing_factor()
-                            self.__delta = smoothing_factor * self.__delta + (1 - smoothing_factor) * last_val
+    def __check_abrupt_decrease(self):
+        last_mu = self._smoothing.get_smoothed_value()
+        last_val = self.__window[-1]
 
-                            if self.__abrupt_decrease_cum > 0:
-                                self.__abrupt_decrease_cum -= 1
+        # checking abrupt decrease of new values
+        if self.__delta == 0:
+            self.__delta = last_val
+        else:
+            if (self.__delta - last_val) >= (self.__delta - last_mu) / 2:
+                # got abrupt decrease
+
+                self.__abrupt_decrease_cum += 1
+
+                if self.__abrupt_decrease_cum == self.__stop_alarm_delay:
+                    # detected end of attack
+
+                    self.__clear()
+            else:
+                # updating self.__delta with exponentially weighted moving average method
+
+                smoothing_factor = self._smoothing.get_smoothing_factor()
+                self.__delta = smoothing_factor * self.__delta + (1 - smoothing_factor) * last_val
+
+                if self.__abrupt_decrease_cum > 0:
+                    self.__abrupt_decrease_cum -= 1
+
+    def __clear(self):
+        print(f"{bcolors.OKGREEN}DoS ended{bcolors.ENDC}")
+        self._under_attack = False
+        self.__abrupt_decrease_cum = 0
+        self.__delta = 0
+        self._test_statistic = 0
+        self.__attack_ending_cum = 0
+        self._detection_threshold = 0
+        self.__start_ending_forecasting = False
+        self.__start_abrupt_decrease_check = False
 
     def update(self, value: float):
         self._outlier_processing(value)
         self._data_smoothing(value)
         self._cusum_detection()
 
-        print("Alarm Dur: ", self.__alarm_dur)
-
         return self._test_statistic
 
 
 class SYNNPCusumDetector(NPCusumDetector):
     def __init__(self):
-        super(SYNNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing())
+        super(SYNNPCusumDetector, self).__init__()
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
@@ -319,64 +361,13 @@ class SYNNPCusumDetector(NPCusumDetector):
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
         self.update(syn_value)
-        #print(f"{bcolors.OKBLUE}DoS attack detected{bcolors.ENDC}")
+
         print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
         print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
         print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
         print(f"{bcolors.OKCYAN}SYN volume: {bcolors.ENDC}" + str(self._test_statistic))
         print(f"{bcolors.OKCYAN}SYN Mu: {bcolors.ENDC}" + str(self._smoothing.get_smoothed_value()))
         print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
-        print()
-
-        return self._test_statistic
-
-
-class UDPNPCusumDetector(NPCusumDetector):
-    def __init__(self, mean_window_dim=10):
-        super(UDPNPCusumDetector, self).__init__(4, 4, SingleExponentialSmoothing(), window_size=3)
-
-        self.__mean_window_dim = mean_window_dim
-        self.__mean_window = []
-
-    def analyze(self, value: int):
-        udp_value = 0.0
-        udp_mean = 0.0
-
-        if not self._under_attack:
-            # updating udp mean factor
-            self.__mean_window.append(value)
-
-            window_len = len(self.__mean_window)
-
-            if self.__mean_window_dim >= window_len > 0:
-                udp_mean = sum(self.__mean_window) / window_len
-
-            elif window_len == self.__mean_window_dim + 1:
-                self.__mean_window = self.__mean_window[1:]
-                udp_mean = sum(self.__mean_window) / self.__mean_window_dim
-
-        else:
-            udp_mean = sum(self.__mean_window) / self.__mean_window_dim
-
-        print(self.__mean_window)
-
-        distance_from_mean = float(value) - udp_mean * 1.2
-
-        print("Value: ", value)
-        print("Mean: ", udp_mean)
-        print("Distance from mean: ", distance_from_mean)
-
-        if value != 0 and distance_from_mean > 0:
-            udp_value = distance_from_mean / float(value)
-
-        self.update(udp_value)
-
-        print("UDP Value: %.10f" % udp_value)
-        print("UDP Zeta: " + str(self._z))
-        print("UDP Sigma: " + str(self._sigma))
-        print("UDP volume: " + str(self._test_statistic))
-        print("UDP Mu: " + str(self._mu))
-        print("UDP Threshold: " + str(self._detection_threshold))
         print()
 
         return self._test_statistic

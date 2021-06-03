@@ -1,7 +1,7 @@
 import threading
 from scapy.sendrecv import sniff
-from scapy.layers.inet import TCP, UDP, IP
-from .detectors import UDPNPCusumDetector, SYNNPCusumDetector
+from scapy.layers.inet import TCP, IP
+from .detectors import SYNNPCusumDetector
 import time
 import netifaces as ni
 
