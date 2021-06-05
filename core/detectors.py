@@ -281,6 +281,7 @@ class NPCusumDetector:
 
                 print("next_z_values: ", next_z_values)
                 print("next_mu_values: ", next_mu_values)
+                print("test aaaaaa")
 
                 if all(i < j for i, j in zip(next_mu_values, next_mu_values[1:])):
                     # next values are all increasing (attack won't be stopped)
