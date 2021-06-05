@@ -363,6 +363,8 @@ class SYNNPCusumDetector(NPCusumDetector):
         if syn_count != 0:
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
+        syn_value = max(syn_value, 0)
+
         self.update(syn_value)
         print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
         print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
