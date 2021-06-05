@@ -86,6 +86,8 @@ class NPCusumDetector:
                  outlier_threshold: float = 0.65
                  ):
 
+        self._alarm_dur = 1
+
         # the volume computed (used to check threshold excess)
         self._test_statistic = 0
 
@@ -255,7 +257,8 @@ class NPCusumDetector:
                 return
         else:
             # under attack
-            # checking end of an attack throughout sign of self.__z
+            # checking end of an attack throughout sign of self.__z]
+            self._alarm_dur += 1
 
             next_z_values = []
             next_mu_values = []
@@ -313,7 +316,7 @@ class NPCusumDetector:
         if self.__delta == 0:
             self.__delta = last_val
         else:
-            if (self.__delta - last_val) >= (self.__delta - last_mu) / 2:
+            if (self.__delta - self._sigma - last_val) >= (self.__delta - self._sigma - last_mu) / 2:
                 # got abrupt decrease
 
                 self.__abrupt_decrease_cum += 1
@@ -361,7 +364,7 @@ class SYNNPCusumDetector(NPCusumDetector):
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
         self.update(syn_value)
-
+        print(f"{bcolors.WARNING}Alarm dur:  {bcolors.ENDC}" + str(self._alarm_dur))
         print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
         print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
         print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
