@@ -5,17 +5,20 @@ from .detectors import SYNNPCusumDetector, SYNCusumDetector
 import time
 import netifaces as ni
 
+
 class TrafficAnalyzer:
     """
     A thread used for capturing traffic and saving data of interest into DB
     """
+    
 
-    def __init__(self, source, live_capture=False, time_interval=5):
+    def __init__(self, source, plot, live_capture=False, time_interval=5):
         self.__timestamp = time.time()
         self.__source = source
         self.__live_capture = live_capture
         self.__time_interval = time_interval
-
+        self.plot = plot
+        
         self.__syn_cusum = SYNCusumDetector()
 
         self.__syn_counter = 0
@@ -29,7 +32,10 @@ class TrafficAnalyzer:
         - If threshold is not exceeded but in last interval an attack was detected resets last computed ewma to 0.
         """
 
-        self.__syn_cusum.analyze(self.__syn_counter, self.__synack_counter)
+        volume = self.__syn_cusum.analyze(self.__syn_counter, self.__synack_counter)
+
+        ts1 = int(time.time())
+        self.plot.update_syn_data([volume,10], ts1)
 
         self.__syn_counter = 0
         self.__synack_counter = 0
@@ -72,6 +78,8 @@ class TrafficAnalyzer:
                 self.__syn_counter += 1
             elif (pkt[TCP].flags & syn) and (pkt[TCP].flags & ack) and (pkt[IP].src == local_addr):
                 self.__synack_counter += 1
+
+        
 
     def start(self):
         """
