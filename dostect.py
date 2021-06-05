@@ -4,6 +4,7 @@ import socket
 import netifaces
 from core.traffic import TrafficAnalyzer
 from core.graph import Graph
+import sys
 
 # Check if the input file has a valid extension
 def is_valid_capture(parser, arg):
@@ -39,39 +40,42 @@ def main():
     source_group.add_argument('-r','-pcap', action='store', dest="file",
                         help="Packet capture file", metavar="FILE.pcap/.pcapng",
                         type=lambda x: is_valid_capture(parser, x))
-    parser.add_argument('--s', '-slice', dest='interval', action='store',default=5.0,
+    parser.add_argument('-s', '-slice', dest='interval', action='store',default=5.0,
                         help="Specify duration of time interval observation (ex: 5.0, 10.00)")
+   
+    parser.add_argument("-p",  action='store', dest="param",type=bool, nargs='?',
+                        const=True, default=False,
+                        help="Activate parametric mode")
+    parser.add_argument("-g", '-graph',  action='store', dest="graph",type=bool, nargs='?',
+                        const=True, default=False,
+                        help="Activate parametric mode")
 
-    # threshold=10, sigma=100, alpha=0.5, beta=0.95, ewma_factor
-    param_group = parser.add_argument_group('Parametric CUSUM/EWMA', 'Description here')
-    param_group.add_argument('-p','-param-cusum', action='store', dest="param", 
-                        help="Set detection alghorithm to parametric CUSUM/EWMA", type=bool)
-    param_group.add_argument('-t','-threshold', action='store', dest="threshold", 
-                        help="Description threshold here", type=int)
-    param_group.add_argument('-v','-variance', action='store', dest="sigma", 
-                        help="Description variance here", type=int)
-    param_group.add_argument('-a','-alpha', action='store', dest="alpha", 
-                        help="Description alpha here", type=float)
-    param_group.add_argument('-b','-beta', action='store', dest="beta", 
-                        help="Description beta here", type=float)
-                    
-   # TODO: Non parametric CUSUM/EWMA parameter input
-   # free parameter: tau_s, t_o, delay, 
-   # nparam_group = parser.add_argument_group('Non parametric CUSUM/EWMA', 'Description here')
-   # nparam_group.add_argument('-np','-nonparam-cusum', action='store', dest="nparam",
-   #                     help="Set detection alghorithm to non-parametric CUSUM/EWMA",type=bool)
+    parser.add_argument('-t','-threshold', action='store', dest="threshold", default=0.65, 
+                        help="Threshold detection value for Parametric CUSUM", type=float)
+    
+   # TODO: create exclusive group with (-t && -p) 
+   # graph thread termination
 
     # Parse from keyboard
     args = parser.parse_args()
-    plot =  Graph()
+    plot = None
+    if args.graph:
+        plot = Graph()
+
     if args.file is None:
         source = str(args.interface)
-        analyzer = TrafficAnalyzer(source, plot, live_capture=True)
+        print("Threshold: " + str(args.threshold) +  " - Interval: " + str(args.interval) + " - Graph: " + str(args.graph) + " - Plot istance: " + str(plot))
+        analyzer = TrafficAnalyzer(source, plot=plot, live_capture=True, parametric=args.param, time_interval=int(args.interval), threshold=float(args.threshold))
     else:
         source = str(args.file)
         analyzer = TrafficAnalyzer(source, plot)
-
-    analyzer.start()
+    
+    try:
+        # Start analyzer
+        analyzer.start()
+    except (KeyboardInterrupt, SystemExit):
+        sys.exit()
+   
     
 
 if __name__ == "__main__":

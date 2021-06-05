@@ -300,6 +300,8 @@ class NPCusumDetector:
                 # not under attack and not necessity of threshold adjustment
                 return
         else:
+
+            self._test_statistic += self._z
             # under attack
             # checking end of an attack throughout sign of self.__z
 
@@ -418,12 +420,12 @@ class SYNNPCusumDetector(NPCusumDetector):
         print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
         print()
 
-        return self._test_statistic
+        return self._test_statistic, self._detection_threshold
 
 
 class SYNCusumDetector(CusumDetector):
-    def __init__(self):
-        super().__init__(threshold=0.65)
+    def __init__(self, threshold=0.65):
+        super().__init__(threshold=threshold)
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
@@ -442,4 +444,4 @@ class SYNCusumDetector(CusumDetector):
         print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
         print()
 
-        return self._test_statistic
+        return self._test_statistic, self._detection_threshold

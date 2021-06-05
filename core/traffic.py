@@ -12,14 +12,22 @@ class TrafficAnalyzer:
     """
     
 
-    def __init__(self, source, plot, live_capture=False, time_interval=5):
+    def __init__(self, source, plot=None, live_capture=False, parametric=False, time_interval=5, threshold=0.65):
         self.__timestamp = time.time()
         self.__source = source
         self.__live_capture = live_capture
         self.__time_interval = time_interval
-        self.plot = plot
+        self.__threshold = threshold
+        self.__graph = False
+
+        if plot is not None:
+            self.plot = plot
+            self.__graph = True
         
-        self.__syn_cusum = SYNCusumDetector()
+        if parametric:
+            self.__syn_cusum = SYNCusumDetector(threshold=threshold)
+        else: 
+            self.__syn_cusum = SYNNPCusumDetector()
 
         self.__syn_counter = 0
         self.__synack_counter = 0
@@ -32,10 +40,11 @@ class TrafficAnalyzer:
         - If threshold is not exceeded but in last interval an attack was detected resets last computed ewma to 0.
         """
 
-        volume = self.__syn_cusum.analyze(self.__syn_counter, self.__synack_counter)
+        volume, threshold = self.__syn_cusum.analyze(self.__syn_counter, self.__synack_counter)
 
-        ts1 = int(time.time())
-        self.plot.update_syn_data([volume,10], ts1)
+        if self.__graph:
+            ts1 = int(time.time())
+            self.plot.update_data([volume,threshold], ts1)
 
         self.__syn_counter = 0
         self.__synack_counter = 0
