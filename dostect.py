@@ -54,7 +54,7 @@ def main():
                         help="Threshold detection value for Parametric CUSUM", type=float)
     
    # TODO: create exclusive group with (-t && -p) 
-   # graph thread termination
+   # graph thread termination interrupt
 
     # Parse from keyboard
     args = parser.parse_args()
@@ -64,7 +64,6 @@ def main():
 
     if args.file is None:
         source = str(args.interface)
-        print("Threshold: " + str(args.threshold) +  " - Interval: " + str(args.interval) + " - Graph: " + str(args.graph) + " - Plot istance: " + str(plot))
         analyzer = TrafficAnalyzer(source, plot=plot, live_capture=True, parametric=args.param, time_interval=int(args.interval), threshold=float(args.threshold))
     else:
         source = str(args.file)
@@ -76,7 +75,6 @@ def main():
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
    
-    
 
 if __name__ == "__main__":
     main()

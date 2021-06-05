@@ -58,15 +58,9 @@ class Graph():
         #Create write API for points creation
         self.write_api = client.write_api(write_options=SYNCHRONOUS)
   
-
-        try:
-            # Start writing thread
-           self._run()
-        except (KeyboardInterrupt, SystemExit):
-            sys.exit()
-       
-       
-
+        # Start writing thread
+        self._run()
+    
 
     def write_data(self):
 
@@ -92,9 +86,13 @@ class Graph():
     def _run(self):
 
         #Run writing point function every self.interval sec
-        threading.Timer(self.interval, self._run).start()
-        self.write_data()
+        try:
+            threading.Timer(self.interval, self._run).start()
+            self.write_data()
     
+        except (KeyboardInterrupt, SystemExit):
+            sys.exit()
+     
     
 
 
