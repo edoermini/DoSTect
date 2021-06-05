@@ -1,5 +1,5 @@
 import math
-from .forecasting import ExponentialSmoothing, SingleExponentialSmoothing, DoubleExponentialSmoothing
+from .forecasting import SingleExponentialSmoothing, DoubleExponentialSmoothing
 
 
 class bcolors:
@@ -19,60 +19,106 @@ class CusumDetector:
     Parametric cumulative sum implementation for anomaly detection
     """
 
-    def __init__(self, threshold, sigma, alpha=0.5, ewma_factor=0.98):
-        self._threshold = threshold
+    def __init__(self, threshold, alpha=0.5, window_size=3):
 
-        # the gaussian's variance
-        # intuitively indicates how much the new value is important in volume (self._test_statistics) computing
-        self._sigma_square = sigma ** 2
+        self._detection_threshold = threshold
+
+        self._sigma = 0
 
         # percentage beyond which the mean value (self.__mu) can be considered as anomalous behaviour
         self._alpha = alpha
-
-        # exponentially weighted moving average factor
-        self.__ewma_factor = ewma_factor
-
-        # exponentially weighted moving average of values in window
-        self._mu = 0
 
         # the volume computed (used to check threshold excess)
         self._test_statistic = 0
 
         self._under_attack = False
 
+        # smoothing objects that implements the smoothing function
+        self._smoothing = SingleExponentialSmoothing()
+
+        # maximum number of elements inside window
+        self.__window_size = window_size
+        # list of last self.__window_size elements
+        self.__window = []
+
+        # once read self.__window_size values starts to apply cusum to new values
+        self.__start_cusum = False
+
+        self._z = 0
+
     def _data_smoothing(self, value: float):
-        """
-        Cumulative sum (CUSUM) implementation. \n
-        Equation:
-            - g_{n} = max( (g_{n-1} + (alpha*mu_{n-1} / sigma^{2}) * (x_{n} - mu_{n-1} - alpha*mu_{n-1}/2) , 0) \n
-            - mu_{n} = beta*mu_{n-1} + (1- beta)*x_{n}
-        where x_{n} is the metric (number of SYN packets) at interval n
-        """
 
-        # calulating cusum value
-        new_cusum = self._test_statistic + ((self._alpha * self._mu) / (self._sigma_square)) * (
-                value - self._mu - self._alpha * self._mu / 2)
+        if len(self.__window) < self.__window_size:
+            # filling window
 
-        self._test_statistic = max(new_cusum, 0)
+            self.__window.append(value)
+            return
 
-        # updating exponentially weighted moving average
-        self._mu = self.__ewma_factor * self._mu + (1 - self.__ewma_factor) * value
+        elif len(self.__window) == self.__window_size and not self.__start_cusum:
+            # first time that the window is full
+
+            self.__window.append(value)
+            self.__window = self.__window[1:]
+
+            self._smoothing.initialize(self.__window)
+
+            mean = self._smoothing.get_smoothed_value()
+
+            # calculating simga value
+            square_sum = 0
+            for val in self.__window:
+                square_sum += (val - mean) ** 2
+
+            self._sigma = math.sqrt(square_sum / self.__window_size)
+
+            self.__start_cusum = True
+
+        self.__window.append(value)
+        self.__window = self.__window[1:]
+
+        # calculating window mean
+        window_mean = sum(self.__window) / self.__window_size
+
+        print(window_mean)
+
+        smoothing_factor = self._smoothing.get_smoothing_factor()
+
+        # saving previous values of mu and sigma
+        last_mu = self._smoothing.get_smoothed_value()
+        last_sigma_square = self._sigma ** 2
+
+        self._smoothing.forecast(window_mean)
+
+        # calculating simga value
+        self._sigma = math.sqrt(
+            smoothing_factor * last_sigma_square +
+            (1 - smoothing_factor) * (window_mean - last_mu) ** 2
+        )
+
+        self._z = window_mean - last_mu - 3*last_sigma_square
 
     def _cusum_detection(self):
-        # checking violation
-        if self._test_statistic > self._threshold:
-            self._test_statistic = 0
-            self._under_attack = True
+
+        self._test_statistic = max(self._test_statistic + self._z, 0)
+
+        if not self._under_attack:
+            # checking violation
+            if self._test_statistic > self._detection_threshold:
+                print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
+                self._under_attack = True
+
         else:
-            # violation not detected
-            self._under_attack = False
+            if self._test_statistic <= self._detection_threshold and self._z < 0:
+                # violation not detected
+                print(f"{bcolors.OKGREEN}DoS ended{bcolors.ENDC}")
+                self._test_statistic = 0
+                self._under_attack = False
 
     def update(self, value: float):
         self._data_smoothing(value)
         self._cusum_detection()
 
         return self._test_statistic
-
 
 class NPCusumDetector:
     """
@@ -306,8 +352,6 @@ class NPCusumDetector:
                 self.__clear()
 
     def __check_abrupt_decrease(self):
-        last_mu = self._smoothing.get_smoothed_value()
-        last_sigma = self._sigma
         last_val = self.__window[-1]
 
         # checking abrupt decrease of new values
@@ -356,6 +400,30 @@ class NPCusumDetector:
 class SYNNPCusumDetector(NPCusumDetector):
     def __init__(self):
         super(SYNNPCusumDetector, self).__init__()
+
+    def analyze(self, syn_count: int, synack_count: int):
+        syn_value = 0.0
+
+        if syn_count != 0:
+            syn_value = float(syn_count - synack_count) / float(syn_count)
+
+        syn_value = max(syn_value, 0)
+
+        self.update(syn_value)
+        print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
+        print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
+        print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
+        print(f"{bcolors.OKCYAN}SYN volume: {bcolors.ENDC}" + str(self._test_statistic))
+        print(f"{bcolors.OKCYAN}SYN Mu: {bcolors.ENDC}" + str(self._smoothing.get_smoothed_value()))
+        print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
+        print()
+
+        return self._test_statistic
+
+
+class SYNCusumDetector(CusumDetector):
+    def __init__(self):
+        super().__init__(threshold=0.65)
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0

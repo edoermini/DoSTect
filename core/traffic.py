@@ -1,7 +1,7 @@
 import threading
 from scapy.sendrecv import sniff
 from scapy.layers.inet import TCP, IP
-from .detectors import SYNNPCusumDetector
+from .detectors import SYNNPCusumDetector, SYNCusumDetector
 import time
 import netifaces as ni
 
@@ -16,7 +16,7 @@ class TrafficAnalyzer:
         self.__live_capture = live_capture
         self.__time_interval = time_interval
 
-        self.__syn_cusum = SYNNPCusumDetector()
+        self.__syn_cusum = SYNCusumDetector()
 
         self.__syn_counter = 0
         self.__synack_counter = 0
