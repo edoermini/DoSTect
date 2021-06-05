@@ -86,8 +86,6 @@ class NPCusumDetector:
                  outlier_threshold: float = 0.65
                  ):
 
-        self._alarm_dur = 1
-
         # the volume computed (used to check threshold excess)
         self._test_statistic = 0
 
@@ -258,7 +256,6 @@ class NPCusumDetector:
         else:
             # under attack
             # checking end of an attack throughout sign of self.__z
-            self._alarm_dur += 1
 
             next_z_values = []
             next_mu_values = []
@@ -276,27 +273,19 @@ class NPCusumDetector:
                     self.__mu_values = []
                     self.__start_ending_forecasting = True
             else:
-
-                last_mu = self.__mu_smoothing.get_smoothed_value()
-
                 self.__z_smoothing.forecast(self._z)
                 self.__mu_smoothing.forecast(self._smoothing.get_smoothed_value())
 
-                #next_z_values = self.__z_smoothing.forecast_for(self.__stop_alarm_delay)
-                #next_mu_values = self.__mu_smoothing.forecast_for(self.__stop_alarm_delay)
+                next_z_values = self.__z_smoothing.forecast_for(self.__stop_alarm_delay)
+                next_mu_values = self.__mu_smoothing.forecast_for(self.__stop_alarm_delay)
 
-                '''
+                print("next_z_values: ", next_z_values)
+                print("next_mu_values: ", next_mu_values)
+
                 if all(i < j for i, j in zip(next_mu_values, next_mu_values[1:])):
                     # next values are all increasing (attack won't be stopped)
 
                     if any(n < 0 for n in next_z_values):
-                        # z will be underestimated in next intervals
-                        self.__start_abrupt_decrease_check = True
-                '''
-                if last_mu < self.__mu_smoothing.get_smoothed_value():
-                    # next values are all increasing (attack won't be stopped)
-
-                    if self.__z_smoothing.get_smoothed_value() < 0:
                         # z will be underestimated in next intervals
                         self.__start_abrupt_decrease_check = True
 
@@ -375,7 +364,6 @@ class SYNNPCusumDetector(NPCusumDetector):
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
         self.update(syn_value)
-        print(f"{bcolors.WARNING}Alarm dur:  {bcolors.ENDC}" + str(self._alarm_dur))
         print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
         print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
         print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
