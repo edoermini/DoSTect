@@ -12,13 +12,14 @@ class TrafficAnalyzer:
     """
     
 
-    def __init__(self, source, plot=None, live_capture=False, parametric=False, time_interval=5, threshold=0.65):
+    def __init__(self, source, plot=None, live_capture=False, parametric=False, time_interval=5, threshold=0.65, localaddr = None):
         self.__timestamp = time.time()
         self.__source = source
         self.__live_capture = live_capture
         self.__time_interval = time_interval
         self.__threshold = threshold
         self.__graph = False
+        self.__local_addr = localaddr
 
         if plot is not None:
             self.plot = plot
@@ -80,12 +81,16 @@ class TrafficAnalyzer:
                 self.__counter_reader()
                 self.__timestamp += self.__time_interval
 
-        local_addr = ni.ifaddresses(self.__source)[ni.AF_INET][0]['addr']
+        if self.__live_capture:
+            self.__local_addr = ni.ifaddresses(self.__source)[ni.AF_INET][0]['addr']
+        elif self.__local_addr is None:
+            print("ERROR: unable to scan PCAP file without a provided local address!")
+
 
         if pkt.haslayer(TCP):
-            if (pkt[TCP].flags & syn) and not (pkt[TCP].flags & ack) and (pkt[IP].dst == local_addr):
+            if (pkt[TCP].flags & syn) and not (pkt[TCP].flags & ack) and (pkt[IP].dst == self.__local_addr):
                 self.__syn_counter += 1
-            elif (pkt[TCP].flags & syn) and (pkt[TCP].flags & ack) and (pkt[IP].src == local_addr):
+            elif (pkt[TCP].flags & syn) and (pkt[TCP].flags & ack) and (pkt[IP].src == self.__local_addr):
                 self.__synack_counter += 1
 
         

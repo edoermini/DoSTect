@@ -5,6 +5,7 @@ import netifaces
 from core.traffic import TrafficAnalyzer
 from core.graph import Graph
 import sys
+import ipaddress
 
 # Check if the input file has a valid extension
 def is_valid_capture(parser, arg):
@@ -24,11 +25,10 @@ def is_valid_interface(parser, arg):
         return arg
     else:
         parser.error("Interface %s not found" % arg)
-
-   
+    
 
 def main():
-    parser = argparse.ArgumentParser(description="DoSTect allow to detect SYN flooding attack with CUSUM/EWMA forecasting alghorithm")
+    parser = argparse.ArgumentParser(description="DoSTect allow to detect SYN flooding attack with Parametric/Non Parametric CUSUM change point detection")
     
     # Create an exclusive group: in this group only one parameter can be used at time
     source_group = parser.add_mutually_exclusive_group(required=True)
@@ -40,34 +40,61 @@ def main():
     source_group.add_argument('-r','-pcap', action='store', dest="file",
                         help="Packet capture file", metavar="FILE.pcap/.pcapng",
                         type=lambda x: is_valid_capture(parser, x))
+
     parser.add_argument('-s', '-slice', dest='interval', action='store',default=5.0,
                         help="Specify duration of time interval observation (ex: 5.0, 10.00)")
    
-    parser.add_argument("-p",  action='store', dest="param",type=bool, nargs='?',
+    parser.add_argument("-p", "-parametric",  action='store', dest="param",type=bool, nargs='?',
                         const=True, default=False,
                         help="Activate parametric mode")
+
     parser.add_argument("-g", '-graph',  action='store', dest="graph",type=bool, nargs='?',
                         const=True, default=False,
-                        help="Activate parametric mode")
+                        help="Activate influxDB data sender")
 
-    parser.add_argument('-t','-threshold', action='store', dest="threshold", default=0.65, 
+    parser.add_argument('-t','-threshold', action='store', dest="threshold", 
                         help="Threshold detection value for Parametric CUSUM", type=float)
     
-   # TODO: create exclusive group with (-t && -p) 
-   # graph thread termination interrupt
+    parser.add_argument('-l','-local-address', action='store', dest="localaddr", 
+                        help=" IPv4 local address for PCAP capture", type=str)
+    
 
-    # Parse from keyboard
+    # TODO: graph thread termination interrupt
+    # Arguments parser
     args = parser.parse_args()
+
+    # Check param && threshold dependency
+    #if (args.param and args.threshold is None) or (not args.param and args.threshold is not None):
+    #    parser.error("-param requires -threshold [FLOAT].")
+
+    # Check file && localaddr dependency
+    if (args.file and args.localaddr is None) or (args.interface and args.localaddr is not None):
+        parser.error("-pcap requires -local-address [LOCAL ADDRESS].")
+    
+    elif args.file is not None:
+         # Check localaddr format
+        try: 
+            ipaddress.IPv4Address(args.localaddr)
+        except:
+            parser.error("%s is not an IPv4 address!" %  str(args.localaddr))
+
+    # Initialize to default value if None
+    if args.threshold is None:
+        args.threshold = 0.65
+
+    # Initialize to Graph module if -g mode
     plot = None
     if args.graph:
         plot = Graph()
 
+     # Start live capture if file is None (-i [INTERFACE] mode)
     if args.file is None:
         source = str(args.interface)
         analyzer = TrafficAnalyzer(source, plot=plot, live_capture=True, parametric=args.param, time_interval=int(args.interval), threshold=float(args.threshold))
     else:
+        #Start analyzer from PCAP capture (-r [FILE] mode)
         source = str(args.file)
-        analyzer = TrafficAnalyzer(source, plot)
+        analyzer = TrafficAnalyzer(source, plot=plot, parametric=args.param, time_interval=int(args.interval), threshold=float(args.threshold))
     
     try:
         # Start analyzer
