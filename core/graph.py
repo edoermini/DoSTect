@@ -10,10 +10,9 @@ import heapq
 import threading
 import os
 import sys
-
+import signal
 
 class Graph():
-
 
     def __init__(self, time_interval=5.0):
 
@@ -34,7 +33,8 @@ class Graph():
         self.write_api = None
         self.tcp_queue = []
         self._timer     = None
-        
+        self.t = None
+        signal.signal(signal.SIGINT,self.signalHandling)
 
         try:
             # Load influx configuration from .ini file
@@ -82,17 +82,18 @@ class Graph():
         # Insert TCP volume into shared priority queue (<timestamp:[volume, threshold]>)
         heapq.heappush(self.tcp_queue, (timestamp, data))
        
-        
-    def _run(self):
+    def signalHandling(self, signalNumber, frame):
+        t.cancel()
 
+    def _run(self):
         #Run writing point function every self.interval sec
-        try:
-            threading.Timer(self.interval, self._run).start()
-            self.write_data()
-    
+        #ry:
+        self.t = threading.Timer(self.interval, self._run).start()
+        self.write_data()
+    '''
         except (KeyboardInterrupt, SystemExit):
             sys.exit()
-     
+     '''
     
 
 
