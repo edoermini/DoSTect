@@ -8,16 +8,11 @@ import netifaces as ni
 
 class TrafficCatcher:
 
-    def __init__(self, source: str, plot=None, parametric=False, time_interval=5, threshold=0.65):
+    def __init__(self, source: str, parametric=False, time_interval=5, threshold=0.65):
 
         self._time_interval = time_interval
         self._source = source
         self._threshold = threshold
-        self._graph = False
-
-        if plot is not None:
-            self.plot = plot
-            self._graph = True
 
         if parametric:
             self._syn_cusum = SYNCusumDetector(threshold=threshold)
@@ -37,12 +32,10 @@ class TrafficCatcher:
 
         volume, threshold = self._syn_cusum.analyze(self._syn_counter, self._synack_counter)
 
-        if self._graph:
-            ts1 = int(time.time())
-            self.plot.update_data([volume, threshold], ts1)
-
         self._syn_counter = 0
         self._synack_counter = 0
+
+        return volume, threshold
 
 
 class LiveCatcher(TrafficCatcher):
@@ -51,10 +44,15 @@ class LiveCatcher(TrafficCatcher):
     """
 
     def __init__(self, source, plot=None, parametric=False, time_interval=5, threshold=0.65):
-        super().__init__(source, plot, parametric, time_interval, threshold)
+        super().__init__(source, parametric, time_interval, threshold)
 
         self.__timestamp = time.time()
         self.__ipv4_address = ni.ifaddresses(self._source)[ni.AF_INET][0]['addr']
+
+        self.__graph = False
+        if plot is not None:
+            self.__plot = plot
+            self.__graph = True
 
     def __callback(self, pkt):
         """
@@ -75,7 +73,23 @@ class LiveCatcher(TrafficCatcher):
         if self._time_interval <= diff_time < self._time_interval * 2:
 
             print(pkt.time)
-            self._counter_reader()
+
+            syn_count = self._syn_counter
+            synack_count = self._synack_counter
+
+            volume, threshold = self._counter_reader()
+
+            # graphing
+            if self.__graph:
+                self.__plot.update_data(
+                    (
+                        ("volume", float(volume)),
+                        ("threshold", float(threshold)),
+                        ("syn_counter", int(syn_count)),
+                        ("synack_counter", int(synack_count))
+                    ), time.time()
+                )
+
             self.__timestamp += self._time_interval
 
         # if it's been more than self.__time_interval*2 seconds:
@@ -86,7 +100,12 @@ class LiveCatcher(TrafficCatcher):
 
             # for each lost interval will be called self.__counter_reader()
             for c in range(lost_intervals_number):
-                self._counter_reader()
+                volume, threshold = self._counter_reader()
+
+                # graphing
+                if self.__graph:
+                    self.__plot.update_data((volume, threshold), time.time())
+
                 self.__timestamp += self._time_interval
 
         if pkt.haslayer(TCP):
@@ -102,14 +121,15 @@ class LiveCatcher(TrafficCatcher):
 
         sniff(iface=self._source, prn=self.__callback, store=0)
 
+
 class OfflineCatcher(TrafficCatcher):
     """
     A thread used for capturing traffic and saving data of interest into DB
     """
 
-    def __init__(self, source, ipv4_address, plot=None, parametric=False, time_interval=5, threshold=0.65):
+    def __init__(self, source, ipv4_address, parametric=False, time_interval=5, threshold=0.65):
 
-        super().__init__(source, plot, parametric, time_interval, threshold)
+        super().__init__(source, parametric, time_interval, threshold)
 
         self.__ipv4_address = ipv4_address
 
@@ -131,8 +151,7 @@ class OfflineCatcher(TrafficCatcher):
         if self.__first_pkt_timestamp == 0:
             self.__first_pkt_timestamp = pkt.time
 
-        # current time minus last computation time
-        #diff_time = time.time() - self.__timestamp
+        # current packet time minus first packet time in interval
         diff_time = pkt.time - self.__first_pkt_timestamp
 
         # checks if it's been at least self.__time_interval seconds and not more than self.__time_interval*2

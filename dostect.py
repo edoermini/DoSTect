@@ -85,7 +85,7 @@ def main():
     # Initialize to Graph module if -g mode
     plot = None
     if args.graph:
-        plot = Graph()
+        plot = Graph(os.path.join(os.path.dirname(__file__), 'config/influxdb/config.ini'))
 
     # Start live capture if file is None (-i [INTERFACE] mode)
     if args.file is None:
@@ -101,7 +101,6 @@ def main():
         analyzer = OfflineCatcher(
             source=str(args.file),
             ipv4_address=str(args.address),
-            plot=plot,
             parametric=args.param,
             time_interval=int(args.interval),
             threshold=float(args.threshold),
