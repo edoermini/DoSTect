@@ -25,7 +25,7 @@ def is_valid_interface(parser, arg):
         return arg
     else:
         parser.error("Interface %s not found" % arg)
-    
+
 
 def main():
     parser = argparse.ArgumentParser(description="DoSTect allow to detect SYN flooding attack with Parametric/Non Parametric CUSUM change point detection")
@@ -41,7 +41,7 @@ def main():
                         help="Packet capture file", metavar="FILE .pcap/.pcapng",
                         type=lambda x: is_valid_capture(parser, x))
 
-    parser.add_argument('-s', '--slice', dest='interval', action='store',default=5,
+    parser.add_argument('-s', '--slice', dest='interval', action='store',default=5.0,
                         help="Specify duration of time interval observation in seconds (e.g: 5)")
    
     parser.add_argument("-p", "--parametric",  action='store', dest="param",type=bool, nargs='?',
@@ -57,6 +57,7 @@ def main():
     
     parser.add_argument('-a', '--address', action='store', dest="address",
                         help=" IPv4 address of attacked machine for PCAP capture: requires --file", type=str)
+
     
     #TODO: 1| add config.ini path parser
     #      2| pretty output
@@ -66,12 +67,20 @@ def main():
     # Arguments parser
     args = parser.parse_args()
 
+    #Check if slice is int()
+    try: 
+        int(args.interval)
+    except:
+        parser.error("%s is not a valid integer time interval!" % str(args.interval))
+
+
+    #Check if graph mode and file capture both selected
     if (args.graph and args.file is not None):
             parser.error("--graph unable to start with --file [FILE .pcap/.pcapng]")
-            
+
     # Check file && localaddr dependency
     if (args.file and args.address is None) or (args.interface and args.address is not None):
-        parser.error("--pcap requires --address [LOCAL ADDRESS].")
+        parser.error("--pcap requires --address [ADDRESS].")
     
     elif args.file is not None:
          # Check address format
