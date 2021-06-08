@@ -8,16 +8,16 @@ import netifaces as ni
 
 class TrafficCatcher:
 
-    def __init__(self, source: str, parametric=False, time_interval=5, threshold=0.65):
+    def __init__(self, source: str, parametric=False, time_interval=5, threshold=0.65, verbose=False):
 
         self._time_interval = time_interval
         self._source = source
         self._threshold = threshold
 
         if parametric:
-            self._syn_cusum = SYNCusumDetector(threshold=threshold)
+            self._syn_cusum = SYNCusumDetector(threshold=threshold, verbose=verbose)
         else:
-            self._syn_cusum = SYNNPCusumDetector()
+            self._syn_cusum = SYNNPCusumDetector(verbose=verbose)
 
         self._syn_counter = 0
         self._synack_counter = 0
@@ -43,11 +43,12 @@ class LiveCatcher(TrafficCatcher):
     A thread used for capturing traffic and saving data of interest into DB
     """
 
-    def __init__(self, source, plot=None, parametric=False, time_interval=5, threshold=0.65):
-        super().__init__(source, parametric, time_interval, threshold)
+    def __init__(self, source, plot=None, parametric=False, time_interval=5, threshold=0.65, verbose=False):
+        super().__init__(source, parametric, time_interval, threshold, verbose)
 
         self.__timestamp = time.time()
         self.__ipv4_address = ni.ifaddresses(self._source)[ni.AF_INET][0]['addr']
+       
 
         self.__graph = False
         if plot is not None:
@@ -127,9 +128,9 @@ class OfflineCatcher(TrafficCatcher):
     A thread used for capturing traffic and saving data of interest into DB
     """
 
-    def __init__(self, source, ipv4_address, parametric=False, time_interval=5, threshold=0.65):
+    def __init__(self, source, ipv4_address, parametric=False, time_interval=5, threshold=0.65, verbose=False):
 
-        super().__init__(source, parametric, time_interval, threshold)
+        super().__init__(source, parametric, time_interval, threshold, verbose)
 
         self.__ipv4_address = ipv4_address
 

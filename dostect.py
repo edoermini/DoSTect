@@ -113,7 +113,8 @@ def main():
             plot=plot,
             parametric=args.param,
             time_interval=int(args.interval),
-            threshold=float(args.threshold)
+            threshold=float(args.threshold),
+            verbose = bool(args.verbose)
         )
     else:
         # Start analyzer from PCAP capture (-f [FILE] mode)
@@ -123,6 +124,7 @@ def main():
             parametric=args.param,
             time_interval=int(args.interval),
             threshold=float(args.threshold),
+            verbose = bool(args.verbose)
         )
 
     def sigint_handler(signum, frame):

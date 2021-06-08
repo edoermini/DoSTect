@@ -1,17 +1,7 @@
 import math
 from .forecasting import SingleExponentialSmoothing, DoubleExponentialSmoothing
+import core.utils as utils
 
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
 class CusumDetector:
@@ -19,7 +9,7 @@ class CusumDetector:
     Parametric cumulative sum implementation for anomaly detection
     """
 
-    def __init__(self, threshold, alpha=0.5, window_size=3):
+    def __init__(self, threshold, alpha=0.5, window_size=3, verbose=False):
 
         self._detection_threshold = threshold
 
@@ -79,7 +69,7 @@ class CusumDetector:
         # calculating window mean
         window_mean = sum(self.__window) / self.__window_size
 
-        print(window_mean)
+        #print(window_mean)
 
         smoothing_factor = self._smoothing.get_smoothing_factor()
 
@@ -104,13 +94,13 @@ class CusumDetector:
         if not self._under_attack:
             # checking violation
             if self._test_statistic > self._detection_threshold:
-                print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
+                utils.red( "DoS attack detected")
                 self._under_attack = True
 
         else:
             if self._test_statistic <= self._detection_threshold and self._z < 0:
                 # violation not detected
-                print(f"{bcolors.OKGREEN}DoS ended{bcolors.ENDC}")
+                utils.green("DoS ended")
                 self._test_statistic = 0
                 self._under_attack = False
 
@@ -129,8 +119,9 @@ class NPCusumDetector:
                  start_alarm_delay: int = 4,
                  stop_alarm_delay: int = 4,
                  window_size: int = 3,
-                 outlier_threshold: float = 0.65
-                 ):
+                 outlier_threshold: float = 0.65,
+                 verbose=False               
+                ):
 
         # the volume computed (used to check threshold excess)
         self._test_statistic = 0
@@ -208,7 +199,7 @@ class NPCusumDetector:
                 if self.__outlier_cum == self.__start_alarm_delay:
                     # reached required times to detect an attack
 
-                    print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
+                    utils.red("DoS attack detected")
                     self.__outlier_cum -= 1
                     self.__z_values.append(self._z)
                     self._under_attack = True
@@ -253,7 +244,7 @@ class NPCusumDetector:
         # calculating window mean
         window_mean = sum(self.__window) / self.__window_size
 
-        print(window_mean)
+        #print(window_mean)
 
         # saving previous values of mu and sigma
         last_mu = self._smoothing.get_smoothed_value()
@@ -293,7 +284,7 @@ class NPCusumDetector:
                 if self._test_statistic >= self._detection_threshold:
                     # under attack
 
-                    print(f"{bcolors.FAIL}DoS attack detected{bcolors.ENDC}")
+                    utils.red("DoS attack detected")
                     self._under_attack = True
                     self.__z_values.append(self._z)
             else:
@@ -381,7 +372,7 @@ class NPCusumDetector:
         print(str(self.__delta - last_val) + ">=" + str(self.__delta))
 
     def __clear(self):
-        print(f"{bcolors.OKGREEN}DoS ended{bcolors.ENDC}")
+        utils.green("DoS ended")
         self._under_attack = False
         self.__abrupt_decrease_cum = 0
         self.__delta = 0
@@ -400,8 +391,10 @@ class NPCusumDetector:
 
 
 class SYNNPCusumDetector(NPCusumDetector):
-    def __init__(self):
-        super(SYNNPCusumDetector, self).__init__()
+    def __init__(self, verbose=False):
+        super(SYNNPCusumDetector, self).__init__(verbose=verbose)
+        self.interval = 0
+        self._verbose = verbose
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
@@ -411,22 +404,26 @@ class SYNNPCusumDetector(NPCusumDetector):
 
         syn_value = max(syn_value, 0)
 
+        self.interval += 1
         self.update(syn_value)
-        print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
-        print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
-        print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
-        print(f"{bcolors.OKCYAN}SYN volume: {bcolors.ENDC}" + str(self._test_statistic))
-        print(f"{bcolors.OKCYAN}SYN Mu: {bcolors.ENDC}" + str(self._smoothing.get_smoothed_value()))
-        print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
-        print()
+        
+        utils.cyan("[" + str(self.interval) + "] SYN volume: ", self._test_statistic)
+        utils.cyan("[" + str(self.interval) + "] SYN Threshold: ", self._detection_threshold)
+        if self._verbose:
+            utils.cyan("[" + str(self.interval) + "] SYN Value: ", syn_value)
+            utils.cyan("[" + str(self.interval) + "] SYN Zeta: ", self._z)
+            utils.cyan("[" + str(self.interval) + "] SYN Sigma: ", self._sigma)
+            utils.cyan("[" + str(self.interval) + "] SYN Mu: ", self._smoothing.get_smoothed_value())
+            print()
 
         return self._test_statistic, self._detection_threshold
 
 
 class SYNCusumDetector(CusumDetector):
-    def __init__(self, threshold=0.65):
-        super().__init__(threshold=threshold)
+    def __init__(self, threshold=0.65, verbose=False):
+        super().__init__(threshold=threshold, verbose=verbose)
         self.interval = 0
+        self._verbose = verbose
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
@@ -435,16 +432,17 @@ class SYNCusumDetector(CusumDetector):
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
         syn_value = max(syn_value, 0)
-        self.interval += 1
 
+        self.interval += 1
         self.update(syn_value)
-        print(f"{bcolors.OKCYAN}Interval number: {bcolors.ENDC}" + str(self.interval))
-        print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
-        print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
-        print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
-        print(f"{bcolors.OKCYAN}SYN volume: {bcolors.ENDC}" + str(self._test_statistic))
-        print(f"{bcolors.OKCYAN}SYN Mu: {bcolors.ENDC}" + str(self._smoothing.get_smoothed_value()))
-        print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
-        print()
+
+        utils.cyan("[" + str(self.interval) + "] SYN volume: ", self._test_statistic)
+        utils.cyan("[" + str(self.interval) + "] SYN Threshold: ", self._detection_threshold)
+        if self._verbose:
+            utils.cyan("[" + str(self.interval) + "] SYN Value: ", syn_value)
+            utils.cyan("[" + str(self.interval) + "] SYN Zeta: ", self._z)
+            utils.cyan("[" + str(self.interval) + "] SYN Sigma: ", self._sigma)
+            utils.cyan("[" + str(self.interval) + "] SYN Mu: ", self._smoothing.get_smoothed_value())
+            print()
         
         return self._test_statistic, self._detection_threshold
