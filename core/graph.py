@@ -101,6 +101,7 @@ class Graph():
         :param frame:
         """
         self.__stopped = True
+        sys.exit()
 
     def __run(self):
         """
@@ -110,6 +111,7 @@ class Graph():
 
         if not self.__stopped:
             threading.Timer(self.interval, self.__run).start()
+        else: sys.exit()
 
         self.__write_data()
     

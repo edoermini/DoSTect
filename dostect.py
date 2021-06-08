@@ -38,41 +38,43 @@ def main():
                         type=lambda x: is_valid_interface(parser, x))
 
     source_group.add_argument('-f','--file', action='store', dest="file",
-                        help="Packet capture file", metavar="FILE.pcap/.pcapng",
+                        help="Packet capture file", metavar="FILE .pcap/.pcapng",
                         type=lambda x: is_valid_capture(parser, x))
 
-    parser.add_argument('-s', '--slice', dest='interval', action='store',default=5.0,
-                        help="Specify duration of time interval observation (ex: 5.0, 10.00)")
+    parser.add_argument('-s', '--slice', dest='interval', action='store',default=5,
+                        help="Specify duration of time interval observation in seconds (e.g: 5)")
    
     parser.add_argument("-p", "--parametric",  action='store', dest="param",type=bool, nargs='?',
                         const=True, default=False,
-                        help="Activate parametric mode")
+                        help="Flag to set CUSUM Parametric mode")
 
     parser.add_argument("-g", '--graph',  action='store', dest="graph",type=bool, nargs='?',
                         const=True, default=False,
-                        help="Activate influxDB data sender")
+                        help="Activate influxDB data sender: requires --interface")
 
     parser.add_argument('-t', '--threshold', action='store', dest="threshold",
-                        help="Threshold detection value for Parametric CUSUM", type=float)
+                        help="Threshold detection value for CUSUM Parametric mode", type=float)
     
     parser.add_argument('-a', '--address', action='store', dest="address",
-                        help=" IPv4 address of attacked machine for PCAP capture", type=str)
+                        help=" IPv4 address of attacked machine for PCAP capture: requires --file", type=str)
     
+    #TODO: 1| add config.ini path parser
+    #      2| pretty output
+    #      3| check --slice type (lambda to check int() type else parser error)
+    #      4| add interval alarm number to data plot
 
-    # TODO: graph thread termination interrupt
     # Arguments parser
     args = parser.parse_args()
 
-    # Check param && threshold dependency
-    #if (args.param and args.threshold is None) or (not args.param and args.threshold is not None):
-    #    parser.error("-param requires -threshold [FLOAT].")
-
+    if (args.graph and args.file is not None):
+            parser.error("--graph unable to start with --file [FILE .pcap/.pcapng]")
+            
     # Check file && localaddr dependency
     if (args.file and args.address is None) or (args.interface and args.address is not None):
         parser.error("--pcap requires --address [LOCAL ADDRESS].")
     
     elif args.file is not None:
-         # Check localaddr format
+         # Check address format
         try: 
             ipaddress.IPv4Address(args.address)
         except:
@@ -97,7 +99,7 @@ def main():
             threshold=float(args.threshold)
         )
     else:
-        # Start analyzer from PCAP capture (-r [FILE] mode)
+        # Start analyzer from PCAP capture (-f [FILE] mode)
         analyzer = OfflineCatcher(
             source=str(args.file),
             ipv4_address=str(args.address),
