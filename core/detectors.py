@@ -426,6 +426,7 @@ class SYNNPCusumDetector(NPCusumDetector):
 class SYNCusumDetector(CusumDetector):
     def __init__(self, threshold=0.65):
         super().__init__(threshold=threshold)
+        self.interval = 0
 
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
@@ -434,8 +435,10 @@ class SYNCusumDetector(CusumDetector):
             syn_value = float(syn_count - synack_count) / float(syn_count)
 
         syn_value = max(syn_value, 0)
+        self.interval += 1
 
         self.update(syn_value)
+        print(f"{bcolors.OKCYAN}Interval number: {bcolors.ENDC}" + str(self.interval))
         print(f"{bcolors.OKCYAN}SYN Value: %.10f {bcolors.ENDC}" % syn_value)
         print(f"{bcolors.OKCYAN}SYN Zeta: {bcolors.ENDC}" + str(self._z))
         print(f"{bcolors.OKCYAN}SYN Sigma: {bcolors.ENDC}" + str(self._sigma))
@@ -443,5 +446,5 @@ class SYNCusumDetector(CusumDetector):
         print(f"{bcolors.OKCYAN}SYN Mu: {bcolors.ENDC}" + str(self._smoothing.get_smoothed_value()))
         print(f"{bcolors.OKCYAN}SYN Threshold: {bcolors.ENDC}" + str(self._detection_threshold))
         print()
-
+        
         return self._test_statistic, self._detection_threshold

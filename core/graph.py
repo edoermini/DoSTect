@@ -39,18 +39,20 @@ class Graph():
         try:
             # Load influx configuration from .ini file: retrieve HOST:PORT, ORG ID, ACCESS TOKEN
             client = influxdb_client.InfluxDBClient.from_config_file(config_file=config_file)
+       
+
+            self.org = client.org
+
+            # Creating buckets API for buckets access
+            bucket = client.buckets_api()
+
+            # Checks if bucket bucket_name already exists, else create it
+            if bucket.find_bucket_by_name(self.bucket_name) is None:
+                bucket.create_bucket(bucket_name=self.bucket_name)
+                print("[Graph mode] - Bucket " + self.bucket_name + " created!")
+
         except Exception:
             raise Exception("Error while connecting to influxdb instance: check your service or .ini file!")
-
-        self.org = client.org
-
-        # Creating buckets API for buckets access
-        bucket = client.buckets_api()
-
-        # Checks if bucket bucket_name already exists, else create it
-        if bucket.find_bucket_by_name(self.bucket_name) is None:
-            bucket.create_bucket(bucket_name=self.bucket_name)
-            print("[Graph mode] - Bucket " + self.bucket_name + " created!")
 
         # Creating write API for points creation
         self.write_api = client.write_api(write_options=SYNCHRONOUS)
@@ -80,8 +82,8 @@ class Graph():
                 self.write_api.write(bucket=self.bucket_name, org=self.org, record=p_syn)
             except Exception:
                 # TODO: fix this case
-                self.__stopped = True
-                raise Exception("Error while writing to influxdb instance: check your service or .ini file!")
+                self.stop_writing_thread()
+                raise Exception("[Graph mode] - Error while writing to influxdb instance: check your service or .ini file!")
 
     def update_data(self, data: tuple, timestamp: int):
         """
@@ -114,4 +116,8 @@ class Graph():
             self.__writing_thread = threading.Timer(self.interval, self.__write_data_thread)
             self.__writing_thread.start()
 
-        self.__write_data()
+        try:
+            self.__write_data()
+        except:
+            print("[Graph mode] - Error while writing to influxdb instance: --graph mode deactivate!")
+            exit(1)

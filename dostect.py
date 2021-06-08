@@ -58,17 +58,20 @@ def main():
     
     parser.add_argument('-a', '--address', action='store', dest="address",
                         help=" IPv4 address of attacked machine for PCAP capture: requires --file", type=str)
+    
+    parser.add_argument("-v", "--verbose",  action='store', dest="verbose",type=bool, nargs='?',
+                        const=True, default=False,
+                        help="Flag to set verbose output mode")
 
     
-    #TODO: 1| add config.ini path parser
-    #      2| pretty output
-    #      3| check --slice type (lambda to check int() type else parser error)
-    #      4| add interval alarm number to data plot
+    #TODO: 1| final stats recap
+    #      2| pretty output (utils class)
+    #      3| verbose mode
 
     # Arguments parser
     args = parser.parse_args()
 
-    #Check if slice is int()
+    #Check if can cast slice to int()
     try: 
         int(args.interval)
     except:
@@ -97,8 +100,11 @@ def main():
     # Initialize to Graph module if -g mode
     plot = None
     if args.graph:
-        print("ciao")
-        plot = Graph(os.path.join(os.path.dirname(__file__), 'config/influxdb/config.ini'))
+        try:
+            plot = Graph(os.path.join(os.path.dirname(__file__), 'config/influxdb/config.ini'))
+        except:
+             print("[Graph startup] - Error while connecting to influxdb instance: check your influxd service!")
+             sys.exit(1)
 
     # Start live capture if file is None (-i [INTERFACE] mode)
     if args.file is None:
