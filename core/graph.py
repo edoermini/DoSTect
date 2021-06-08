@@ -10,6 +10,7 @@ import os
 import sys
 import signal
 
+
 class Graph():
 
     def __init__(self, config_file, bucket_name="dostect", time_interval=1):
@@ -32,18 +33,15 @@ class Graph():
         self.tcp_queue = []
         self._timer = None
         self.__stopped = False
-
-        #Register handler for SIGINT
-        signal.signal(signal.SIGINT, self.__signalHandling)
+        self.__writing_thread = None
 
         client = None
         try:
             # Load influx configuration from .ini file: retrieve HOST:PORT, ORG ID, ACCESS TOKEN
             client = influxdb_client.InfluxDBClient.from_config_file(config_file=config_file)
-        except:
-            print("[Graph mode] - Error while connecting to influxdb instance: check your service or .ini file!")
-            exit(1)
-            
+        except Exception:
+            raise Exception("Error while connecting to influxdb instance: check your service or .ini file!")
+
         self.org = client.org
 
         # Creating buckets API for buckets access
@@ -53,12 +51,12 @@ class Graph():
         if bucket.find_bucket_by_name(self.bucket_name) is None:
             bucket.create_bucket(bucket_name=self.bucket_name)
             print("[Graph mode] - Bucket " + self.bucket_name + " created!")
-                    
+
         # Creating write API for points creation
         self.write_api = client.write_api(write_options=SYNCHRONOUS)
-  
+
         # Start periodical writing thread
-        self.__run()
+        self.__write_data_thread()
 
     def __write_data(self):
         """
@@ -80,13 +78,10 @@ class Graph():
             try:
                 # Writing point to influxdb
                 self.write_api.write(bucket=self.bucket_name, org=self.org, record=p_syn)
-            except: 
-                  #TODO: fix this case                  
-                  print("[Graph mode] - Error while writing to influxdb instance: check your service or .ini file!")
-                
-                  self.__stopped = True
-                  sys.exit(1)
-                  
+            except Exception:
+                # TODO: fix this case
+                self.__stopped = True
+                raise Exception("Error while writing to influxdb instance: check your service or .ini file!")
 
     def update_data(self, data: tuple, timestamp: int):
         """
@@ -97,32 +92,26 @@ class Graph():
         """
 
         heapq.heappush(self.tcp_queue, (timestamp, data))
-       
-    def __signalHandling(self, signal_number, frame):
+
+    def stop_writing_thread(self):
         """
         Closes the thread if a signal is reached
 
         :param signal_number:
         :param frame:
         """
-        self.__stopped = True
-        exit(0)
 
-    def __run(self):
+        self.__stopped = True
+        self.__writing_thread.join()
+
+    def __write_data_thread(self):
         """
         Calls self.__write_data() periodically in a thread to write data
         saved into internal shared priority queue asynchronously
         """
 
         if not self.__stopped:
-            threading.Timer(self.interval, self.__run).start()
-        else: sys.exit()
+            self.__writing_thread = threading.Timer(self.interval, self.__write_data_thread)
+            self.__writing_thread.start()
 
         self.__write_data()
-    
-
-
-
-        
-
-  

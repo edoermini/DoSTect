@@ -6,6 +6,7 @@ from core.traffic import OfflineCatcher, LiveCatcher
 from core.graph import Graph
 import sys
 import ipaddress
+import signal
 
 # Check if the input file has a valid extension
 def is_valid_capture(parser, arg):
@@ -74,7 +75,7 @@ def main():
         parser.error("%s is not a valid integer time interval!" % str(args.interval))
 
 
-    #Check if graph mode and file capture both selected
+    # Check if graph mode and file capture both selected
     if (args.graph and args.file is not None):
             parser.error("--graph unable to start with --file [FILE .pcap/.pcapng]")
 
@@ -83,7 +84,7 @@ def main():
         parser.error("--pcap requires --address [ADDRESS].")
     
     elif args.file is not None:
-         # Check address format
+        # Check address format
         try: 
             ipaddress.IPv4Address(args.address)
         except:
@@ -96,6 +97,7 @@ def main():
     # Initialize to Graph module if -g mode
     plot = None
     if args.graph:
+        print("ciao")
         plot = Graph(os.path.join(os.path.dirname(__file__), 'config/influxdb/config.ini'))
 
     # Start live capture if file is None (-i [INTERFACE] mode)
@@ -116,6 +118,16 @@ def main():
             time_interval=int(args.interval),
             threshold=float(args.threshold),
         )
+
+    def sigint_handler(signum, frame):
+
+        if args.graph:
+            plot.stop_writing_thread()
+
+        exit(0)
+
+    # Register handler for SIGINT
+    signal.signal(signal.SIGINT, sigint_handler)
     
     try:
         # Start analyzer

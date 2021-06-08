@@ -172,3 +172,4 @@ class OfflineCatcher(TrafficCatcher):
         """
 
         sniff(offline=self._source, prn=self.__callback, store=0)
+
