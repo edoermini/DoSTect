@@ -3,6 +3,7 @@ from scapy.layers.inet import TCP, IP
 from .detectors import SYNNPCusumDetector, SYNCusumDetector
 import time
 import netifaces as ni
+import curses
 
 
 class TrafficCatcher:
@@ -16,6 +17,10 @@ class TrafficCatcher:
         self._max_volume = 0
         self._min_volume = 0
         self._volumes = []
+
+        stdscr = curses.initscr()
+        stdscr.addstr(0, 0, "Status: monitoring...")
+        stdscr.refresh()
 
         if parametric:
             self._syn_cusum = SYNCusumDetector(threshold=threshold, verbose=verbose)
@@ -69,6 +74,7 @@ class LiveCatcher(TrafficCatcher):
 
         self.__timestamp = time.time()
         self.__ipv4_address = ni.ifaddresses(self._source)[ni.AF_INET][0]['addr']
+
 
         self.__graph = False
         if plot is not None:

@@ -8,6 +8,7 @@ import sys
 import ipaddress
 import signal
 from core import utils
+import curses
 
 # Check if the input file has a valid extension
 def is_valid_capture(parser, arg):
@@ -132,15 +133,31 @@ def main():
 
         if args.graph:
             plot.stop_writing_thread()
+        
+        print_statistics()
 
+
+        exit(0)
+
+    def print_statistics():
+
+        stdscr = curses.initscr()
+
+        stdscr.addstr(9, 0, "Total intervals:           " + str(analyzer.get_total_intervals()))
+        stdscr.addstr(10, 0, "Anomalous intervals count: " + str(analyzer.get_anomalous_intervals_count()))
+        stdscr.addstr(11, 0, "                                                                           ")
+        stdscr.addstr(12, 0, "Max volume reached:        " + str(analyzer.get_max_volume()))
+        stdscr.addstr(13, 0, "Mean volume reached:       " + str(analyzer.get_mean_volume()))
+        stdscr.refresh()
+        '''
         print()
         utils.green("Total intervals:           " + str(analyzer.get_total_intervals()))
         utils.green("Anomalous intervals count: " + str(analyzer.get_anomalous_intervals_count()))
         print()
         utils.green("Max volume reached:        " + str(analyzer.get_max_volume()))
         utils.green("Mean volume reached:       " + str(analyzer.get_mean_volume()))
-
-        exit(0)
+        '''
+    
 
     # Register handler for SIGINT
     signal.signal(signal.SIGINT, sigint_handler)
@@ -150,6 +167,8 @@ def main():
         analyzer.start()
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
+
+    print_statistics()
    
 
 if __name__ == "__main__":

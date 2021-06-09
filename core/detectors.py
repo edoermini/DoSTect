@@ -1,6 +1,7 @@
 import math
 from .forecasting import SingleExponentialSmoothing, DoubleExponentialSmoothing
 import core.utils as utils
+import curses
 
 
 
@@ -94,13 +95,17 @@ class CusumDetector:
         if not self._under_attack:
             # checking violation
             if self._test_statistic > self._detection_threshold:
-                utils.red( "DoS attack detected")
+                stdscr = curses.initscr()
+                stdscr.addstr(0, 0, "Status: DoS attack detected")
+                stdscr.refresh()
                 self._under_attack = True
 
         else:
             if self._test_statistic <= self._detection_threshold and self._z < 0:
                 # violation not detected
-                utils.green("DoS ended")
+                stdscr = curses.initscr()
+                stdscr.addstr(0, 0, "Status: DoS attack ended")
+                stdscr.refresh()
                 self._test_statistic = 0
                 self._under_attack = False
 
@@ -199,7 +204,9 @@ class NPCusumDetector:
                 if self.__outlier_cum == self.__start_alarm_delay:
                     # reached required times to detect an attack
 
-                    utils.red("DoS attack detected")
+                    stdscr = curses.initscr()
+                    stdscr.addstr(0, 0, "Status: DoS attack detected")
+                    stdscr.refresh()
                     self.__outlier_cum -= 1
                     self.__z_values.append(self._z)
                     self._under_attack = True
@@ -283,8 +290,10 @@ class NPCusumDetector:
 
                 if self._test_statistic >= self._detection_threshold:
                     # under attack
-
-                    utils.red("DoS attack detected")
+                    stdscr = curses.initscr()
+                    stdscr.addstr(0, 0, "Status: DoS attack detected")
+                    stdscr.refresh()
+                  
                     self._under_attack = True
                     self.__z_values.append(self._z)
             else:
@@ -362,7 +371,10 @@ class NPCusumDetector:
                     self.__abrupt_decrease_cum -= 1
 
     def __clear(self):
-        utils.green("DoS ended")
+        stdscr = curses.initscr()
+        stdscr.addstr(0, 0, "Status: DoS attack ended")
+        stdscr.refresh()
+
         self._under_attack = False
         self.__abrupt_decrease_cum = 0
         self.__delta = 0
@@ -406,6 +418,20 @@ class SYNNPCusumDetector(NPCusumDetector):
         self.intervals += 1
         self.update(syn_value)
 
+        stdscr = curses.initscr()
+
+        stdscr.addstr(1, 0, "SYN volume:     " + str(self._test_statistic))
+        stdscr.addstr(2, 0, "SYN Threshold: " + str(self._detection_threshold))
+        if self._verbose:
+            stdscr.addstr(3, 0, "SYN Value: " + str(syn_value))
+            stdscr.addstr(4, 0, "SYN Zeta: " + str(self._z))
+            stdscr.addstr(5, 0, "SYN Sigma: " + str(self._sigma))
+            stdscr.addstr(6, 0, "SYN Mu: " + str(self._smoothing.get_smoothed_value()))
+
+        stdscr.refresh()
+
+        """ 
+
         utils.cyan("SYN volume:     ", self._test_statistic)
         utils.cyan("SYN Threshold: ", self._detection_threshold)
 
@@ -417,6 +443,7 @@ class SYNNPCusumDetector(NPCusumDetector):
             print()
         else:
             print()
+         """ 
 
         return self._test_statistic, self._detection_threshold
 
