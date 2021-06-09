@@ -9,7 +9,7 @@ class CusumDetector:
     Parametric cumulative sum implementation for anomaly detection
     """
 
-    def __init__(self, threshold, alpha=0.5, window_size=3, verbose=False):
+    def __init__(self, threshold, alpha=0.5, window_size=3):
 
         self._detection_threshold = threshold
 
@@ -110,6 +110,7 @@ class CusumDetector:
 
         return self._test_statistic
 
+
 class NPCusumDetector:
     """
     Non parametric cumulative sum implementation for anomaly detection
@@ -120,8 +121,7 @@ class NPCusumDetector:
                  stop_alarm_delay: int = 4,
                  window_size: int = 3,
                  outlier_threshold: float = 0.65,
-                 verbose=False               
-                ):
+                 ):
 
         # the volume computed (used to check threshold excess)
         self._test_statistic = 0
@@ -296,9 +296,6 @@ class NPCusumDetector:
             # under attack
             # checking end of an attack throughout sign of self.__z
 
-            next_z_values = []
-            next_mu_values = []
-
             if not self.__start_ending_forecasting:
                 # updating self.__z_values
 
@@ -318,9 +315,6 @@ class NPCusumDetector:
                 next_z_values = self.__z_smoothing.forecast_for(self.__stop_alarm_delay)
                 next_mu_values = self.__mu_smoothing.forecast_for(self.__stop_alarm_delay)
 
-                print("next_z_values: ", next_z_values)
-                print("next_mu_values: ", next_mu_values)
-
                 if all(i < j for i, j in zip(next_mu_values, next_mu_values[1:])):
                     # next values are all increasing (attack won't be stopped)
 
@@ -329,10 +323,8 @@ class NPCusumDetector:
                         self.__start_abrupt_decrease_check = True
 
                 if not self.__start_abrupt_decrease_check:
-                    print("using z for ending check")
                     self.__check_ending_with_z()
                 else:
-                    print("using abrupt decrease check for ending check")
                     self.__check_abrupt_decrease()
 
     def __check_ending_with_z(self):
@@ -369,8 +361,6 @@ class NPCusumDetector:
                 if self.__abrupt_decrease_cum > 0:
                     self.__abrupt_decrease_cum -= 1
 
-        print(str(self.__delta - last_val) + ">=" + str(self.__delta))
-
     def __clear(self):
         utils.green("DoS ended")
         self._under_attack = False
@@ -389,11 +379,20 @@ class NPCusumDetector:
 
         return self._test_statistic
 
+    def under_attack(self):
+        """
+        Tells if a DoS attack was detected
+
+        :return: True if an attack was detected, False otherwise
+        """
+
+        return self._under_attack
+
 
 class SYNNPCusumDetector(NPCusumDetector):
     def __init__(self, verbose=False):
-        super(SYNNPCusumDetector, self).__init__(verbose=verbose)
-        self.interval = 0
+        super(SYNNPCusumDetector, self).__init__()
+        self.intervals = 0
         self._verbose = verbose
 
     def analyze(self, syn_count: int, synack_count: int):
@@ -404,16 +403,19 @@ class SYNNPCusumDetector(NPCusumDetector):
 
         syn_value = max(syn_value, 0)
 
-        self.interval += 1
+        self.intervals += 1
         self.update(syn_value)
-        
-        utils.cyan("[" + str(self.interval) + "] SYN volume: ", self._test_statistic)
-        utils.cyan("[" + str(self.interval) + "] SYN Threshold: ", self._detection_threshold)
+
+        utils.cyan("SYN volume:     ", self._test_statistic)
+        utils.cyan("SYN Threshold: ", self._detection_threshold)
+
         if self._verbose:
-            utils.cyan("[" + str(self.interval) + "] SYN Value: ", syn_value)
-            utils.cyan("[" + str(self.interval) + "] SYN Zeta: ", self._z)
-            utils.cyan("[" + str(self.interval) + "] SYN Sigma: ", self._sigma)
-            utils.cyan("[" + str(self.interval) + "] SYN Mu: ", self._smoothing.get_smoothed_value())
+            utils.cyan("SYN Value: ", syn_value)
+            utils.cyan("SYN Zeta: ", self._z)
+            utils.cyan("SYN Sigma: ", self._sigma)
+            utils.cyan("SYN Mu: ", self._smoothing.get_smoothed_value())
+            print()
+        else:
             print()
 
         return self._test_statistic, self._detection_threshold
@@ -421,8 +423,8 @@ class SYNNPCusumDetector(NPCusumDetector):
 
 class SYNCusumDetector(CusumDetector):
     def __init__(self, threshold=0.65, verbose=False):
-        super().__init__(threshold=threshold, verbose=verbose)
-        self.interval = 0
+        super().__init__(threshold=threshold)
+        self.intervals = 0
         self._verbose = verbose
 
     def analyze(self, syn_count: int, synack_count: int):
@@ -433,16 +435,16 @@ class SYNCusumDetector(CusumDetector):
 
         syn_value = max(syn_value, 0)
 
-        self.interval += 1
+        self.intervals += 1
         self.update(syn_value)
 
-        utils.cyan("[" + str(self.interval) + "] SYN volume: ", self._test_statistic)
-        utils.cyan("[" + str(self.interval) + "] SYN Threshold: ", self._detection_threshold)
+        utils.cyan("[" + str(self.intervals) + "] SYN volume: ", self._test_statistic)
+        utils.cyan("[" + str(self.intervals) + "] SYN Threshold: ", self._detection_threshold)
         if self._verbose:
-            utils.cyan("[" + str(self.interval) + "] SYN Value: ", syn_value)
-            utils.cyan("[" + str(self.interval) + "] SYN Zeta: ", self._z)
-            utils.cyan("[" + str(self.interval) + "] SYN Sigma: ", self._sigma)
-            utils.cyan("[" + str(self.interval) + "] SYN Mu: ", self._smoothing.get_smoothed_value())
+            utils.cyan("[" + str(self.intervals) + "] SYN Value: ", syn_value)
+            utils.cyan("[" + str(self.intervals) + "] SYN Zeta: ", self._z)
+            utils.cyan("[" + str(self.intervals) + "] SYN Sigma: ", self._sigma)
+            utils.cyan("[" + str(self.intervals) + "] SYN Mu: ", self._smoothing.get_smoothed_value())
             print()
         
         return self._test_statistic, self._detection_threshold

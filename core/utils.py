@@ -9,6 +9,7 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
 def green(line, number=""):
     lend = '\33[0m'
     lgreen = '\033[92m'
@@ -19,6 +20,7 @@ def red(line, number=""):
     lend = '\33[0m'
     lred = '\033[91m'
     print(lred + line + lend + str(number))
+
 
 def cyan(line, number=""):
     lend = '\33[0m'

@@ -1,20 +1,12 @@
 from influxdb_client.client.write_api import SYNCHRONOUS
-from influxdb_client.client import write_api
-from influxdb_client.client.influxdb_client import BucketsApi
-from threading import Timer
 import influxdb_client
-from influxdb_client import *
 import heapq
 import threading
-import os
-import sys
-import signal
 
 
 class Graph():
 
     def __init__(self, config_file, bucket_name="dostect", time_interval=1):
-
         """
         Called by traffic catching classes.
         Connect to influxdb2 throughout a given config.ini file.
@@ -39,7 +31,6 @@ class Graph():
         try:
             # Load influx configuration from .ini file: retrieve HOST:PORT, ORG ID, ACCESS TOKEN
             client = influxdb_client.InfluxDBClient.from_config_file(config_file=config_file)
-       
 
             self.org = client.org
 

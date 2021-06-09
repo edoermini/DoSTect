@@ -7,6 +7,7 @@ from core.graph import Graph
 import sys
 import ipaddress
 import signal
+from core import utils
 
 # Check if the input file has a valid extension
 def is_valid_capture(parser, arg):
@@ -33,12 +34,12 @@ def main():
     
     # Create an exclusive group: in this group only one parameter can be used at time
     source_group = parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument('-i','--interface', action='store', dest="interface",
+    source_group.add_argument('-i', '--interface', action='store', dest="interface",
                         help="Network interface from which to perform live capture",
                         metavar="INTERFACE",
                         type=lambda x: is_valid_interface(parser, x))
 
-    source_group.add_argument('-f','--file', action='store', dest="file",
+    source_group.add_argument('-f', '--file', action='store', dest="file",
                         help="Packet capture file", metavar="FILE .pcap/.pcapng",
                         type=lambda x: is_valid_capture(parser, x))
 
@@ -114,7 +115,7 @@ def main():
             parametric=args.param,
             time_interval=int(args.interval),
             threshold=float(args.threshold),
-            verbose = bool(args.verbose)
+            verbose=bool(args.verbose)
         )
     else:
         # Start analyzer from PCAP capture (-f [FILE] mode)
@@ -124,13 +125,20 @@ def main():
             parametric=args.param,
             time_interval=int(args.interval),
             threshold=float(args.threshold),
-            verbose = bool(args.verbose)
+            verbose=bool(args.verbose)
         )
 
     def sigint_handler(signum, frame):
 
         if args.graph:
             plot.stop_writing_thread()
+
+        print()
+        utils.green("Total intervals:           " + str(analyzer.get_total_intervals()))
+        utils.green("Anomalous intervals count: " + str(analyzer.get_anomalous_intervals_count()))
+        print()
+        utils.green("Max volume reached:        " + str(analyzer.get_max_volume()))
+        utils.green("Mean volume reached:       " + str(analyzer.get_mean_volume()))
 
         exit(0)
 

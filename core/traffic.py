@@ -1,4 +1,3 @@
-import threading
 from scapy.sendrecv import sniff
 from scapy.layers.inet import TCP, IP
 from .detectors import SYNNPCusumDetector, SYNCusumDetector
@@ -13,6 +12,10 @@ class TrafficCatcher:
         self._time_interval = time_interval
         self._source = source
         self._threshold = threshold
+        self._anomalous_intervals_count = 0
+        self._max_volume = 0
+        self._min_volume = 0
+        self._volumes = []
 
         if parametric:
             self._syn_cusum = SYNCusumDetector(threshold=threshold, verbose=verbose)
@@ -32,10 +35,28 @@ class TrafficCatcher:
 
         volume, threshold = self._syn_cusum.analyze(self._syn_counter, self._synack_counter)
 
+        self._max_volume = max(volume, self._max_volume)
+        self._volumes.append(volume)
+
+        if self._syn_cusum.under_attack():
+            self._anomalous_intervals_count += 1
+
         self._syn_counter = 0
         self._synack_counter = 0
 
         return volume, threshold
+
+    def get_mean_volume(self) -> float:
+        return sum(self._volumes)/self._syn_cusum.intervals
+
+    def get_max_volume(self) -> float:
+        return self._max_volume
+
+    def get_total_intervals(self) -> int:
+        return self._syn_cusum.intervals
+
+    def get_anomalous_intervals_count(self) -> int:
+        return self._anomalous_intervals_count
 
 
 class LiveCatcher(TrafficCatcher):
@@ -48,7 +69,6 @@ class LiveCatcher(TrafficCatcher):
 
         self.__timestamp = time.time()
         self.__ipv4_address = ni.ifaddresses(self._source)[ni.AF_INET][0]['addr']
-       
 
         self.__graph = False
         if plot is not None:
@@ -72,8 +92,6 @@ class LiveCatcher(TrafficCatcher):
 
         # checks if it's been at least self.__time_interval seconds and not more than self.__time_interval*2
         if self._time_interval <= diff_time < self._time_interval * 2:
-
-            print(pkt.time)
 
             syn_count = self._syn_counter
             synack_count = self._synack_counter
@@ -157,7 +175,6 @@ class OfflineCatcher(TrafficCatcher):
 
         # checks if it's been at least self.__time_interval seconds and not more than self.__time_interval*2
         if self._time_interval <= diff_time:
-            print(pkt.time)
             self._counter_reader()
             self.__first_pkt_timestamp = 0
 

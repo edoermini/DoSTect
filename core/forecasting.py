@@ -91,7 +91,6 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
 
         forecasting_factors_init_guess = np.array([self.__smoothing_factor])
 
-        print("Training values: ", training_values)
         loss_function = lambda x: self.__sse(training_values, x[0])
 
         forecasting_factors = optimize.minimize(
@@ -102,8 +101,6 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
         )
 
         self.__smoothing_factor = forecasting_factors.x[0]
-
-        print("Final smoothing factor: ", self.__smoothing_factor)
 
     def get_smoothed_value(self) -> float:
         return self.__smoothed_value
@@ -161,13 +158,6 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
             return sys.float_info.max
 
     def initialize(self, training_values: list):
-        """
-        Initializes smoothed value to given value for next iterations.
-
-        :param training_values: the values used to estimate forecasting factors
-        and values[1] is the initial trend value
-        """
-
         self.__smoothing_factor = random.uniform(self.__bounds[0][0], self.__bounds[0][1])
         self.__trend_factor = random.uniform(self.__bounds[1][0], self.__bounds[1][1])
 
@@ -191,28 +181,13 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
         self.__smoothing_factor = forecasting_factors.x[0]
         self.__trend_factor = forecasting_factors.x[1]
 
-        print("Smoothing factor: ", self.__smoothing_factor)
-        print("Trend factor: ", self.__trend_factor)
-
     def get_smoothed_value(self) -> float:
-        """
-        Returns the calculated smoothed value
-        """
-
         return self.__smoothed_value + self.__trend_value
 
     def get_smoothing_factor(self) -> float:
         return self.__smoothing_factor
 
     def forecast(self, value: float) -> float:
-        """
-        Applies exponential smoothing algorithm
-        to forecast next value from given value and previous values
-
-        :param value: the new value to do forecasting
-        :return: forecasted value
-        """
-
         last_smoothed_value = self.__smoothed_value
         self.__smoothed_value = self.__smoothing_factor * value + \
                                 (1 - self.__smoothing_factor) * (self.__smoothed_value + self.__trend_value)
