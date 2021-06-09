@@ -3,6 +3,7 @@ from scapy.layers.inet import TCP, IP
 from .detectors import SYNNPCusumDetector, SYNCusumDetector
 import time
 import netifaces as ni
+import core.utils as utils
 import curses
 
 
@@ -17,10 +18,10 @@ class TrafficCatcher:
         self._max_volume = 0
         self._min_volume = 0
         self._volumes = []
-
-        stdscr = curses.initscr()
-        stdscr.addstr(0, 0, "Status: monitoring...")
-        stdscr.refresh()
+        self._time_start = 0
+        self._time_end = 0
+       
+        utils.colors(0,0,"Status: monitoring...",5)
 
         if parametric:
             self._syn_cusum = SYNCusumDetector(threshold=threshold, verbose=verbose)
@@ -45,7 +46,10 @@ class TrafficCatcher:
 
         if self._syn_cusum.under_attack():
             self._anomalous_intervals_count += 1
-
+            if self._time_start == 0:
+                self._time_start = self._syn_cusum.get_time_start()
+        elif self._anomalous_intervals_count > 1: self._time_end = self._syn_cusum.get_time_end()
+        
         self._syn_counter = 0
         self._synack_counter = 0
 
@@ -62,6 +66,12 @@ class TrafficCatcher:
 
     def get_anomalous_intervals_count(self) -> int:
         return self._anomalous_intervals_count
+
+    def get_time_start(self):
+        return self._time_start
+
+    def get_time_end(self):
+        return self._time_end
 
 
 class LiveCatcher(TrafficCatcher):
@@ -103,6 +113,7 @@ class LiveCatcher(TrafficCatcher):
             synack_count = self._synack_counter
 
             volume, threshold = self._counter_reader()
+            
 
             # graphing
             if self.__graph:

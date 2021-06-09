@@ -1,6 +1,7 @@
 from influxdb_client.client.write_api import SYNCHRONOUS
 import influxdb_client
 import heapq
+import core.utils as utils
 import threading
 
 
@@ -40,7 +41,7 @@ class Graph():
             # Checks if bucket bucket_name already exists, else create it
             if bucket.find_bucket_by_name(self.bucket_name) is None:
                 bucket.create_bucket(bucket_name=self.bucket_name)
-                print("[Graph mode] - Bucket " + self.bucket_name + " created!")
+                utils.colors(8,0,"[Graph mode] - Bucket " + self.bucket_name + " created!", 3)
 
         except Exception:
             raise Exception("Error while connecting to influxdb instance: check your service or .ini file!")
@@ -110,5 +111,5 @@ class Graph():
         try:
             self.__write_data()
         except:
-            print("[Graph mode] - Error while writing to influxdb instance: --graph mode deactivate!")
+            utils.colors(8,0,"[Graph mode] - Error while writing to influxdb instance: --graph mode deactivate!", 12)
             exit(1)

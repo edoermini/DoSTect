@@ -8,6 +8,7 @@ import sys
 import ipaddress
 import signal
 from core import utils
+from datetime import datetime
 import curses
 
 # Check if the input file has a valid extension
@@ -64,12 +65,7 @@ def main():
     parser.add_argument("-v", "--verbose",  action='store', dest="verbose",type=bool, nargs='?',
                         const=True, default=False,
                         help="Flag to set verbose output mode")
-
     
-    #TODO: 1| final stats recap
-    #      2| pretty output (utils class)
-    #      3| verbose mode
-
     # Arguments parser
     args = parser.parse_args()
 
@@ -105,8 +101,8 @@ def main():
         try:
             plot = Graph(os.path.join(os.path.dirname(__file__), 'config/influxdb/config.ini'))
         except:
-             print("[Graph startup] - Error while connecting to influxdb instance: check your influxd service!")
-             sys.exit(1)
+            utils.colors(7,0,"[Graph startup] - Error while connecting to influxdb instance: check your influxd service!", 12)
+            sys.exit(1)
 
     # Start live capture if file is None (-i [INTERFACE] mode)
     if args.file is None:
@@ -141,23 +137,18 @@ def main():
 
     def print_statistics():
 
-        stdscr = curses.initscr()
+        
+        utils.colors(9,0,"Total intervals:           " + str(analyzer.get_total_intervals()),3)
+        utils.colors(10,0,"Anomalous intervals count: " + str(analyzer.get_anomalous_intervals_count()),3)
+        utils.colors(12,0,"Max volume reached:        " + str(analyzer.get_max_volume()),3)
+        utils.colors(13,0,"Mean volume reached:       " + str(analyzer.get_mean_volume()),3)
 
-        stdscr.addstr(9, 0, "Total intervals:           " + str(analyzer.get_total_intervals()))
-        stdscr.addstr(10, 0, "Anomalous intervals count: " + str(analyzer.get_anomalous_intervals_count()))
-        stdscr.addstr(11, 0, "                                                                           ")
-        stdscr.addstr(12, 0, "Max volume reached:        " + str(analyzer.get_max_volume()))
-        stdscr.addstr(13, 0, "Mean volume reached:       " + str(analyzer.get_mean_volume()))
-        stdscr.refresh()
-        '''
-        print()
-        utils.green("Total intervals:           " + str(analyzer.get_total_intervals()))
-        utils.green("Anomalous intervals count: " + str(analyzer.get_anomalous_intervals_count()))
-        print()
-        utils.green("Max volume reached:        " + str(analyzer.get_max_volume()))
-        utils.green("Mean volume reached:       " + str(analyzer.get_mean_volume()))
-        '''
-    
+        start_time = analyzer.get_time_start()
+        end_time =  analyzer.get_time_end()
+
+        if start_time != 0 and end_time != 0:
+            utils.colors(14,0,"Attack start detected at:           " + str(datetime.fromtimestamp(start_time)),12)
+            utils.colors(15,0,"End attack detected at:             " + str(datetime.fromtimestamp(end_time)),12)
 
     # Register handler for SIGINT
     signal.signal(signal.SIGINT, sigint_handler)

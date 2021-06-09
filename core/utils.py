@@ -1,28 +1,20 @@
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+import curses
 
+def colors(line, column, txt, rgb):
+    stdscr = curses.initscr()
+    curses.start_color()
+    curses.use_default_colors()
 
-def green(line, number=""):
-    lend = '\33[0m'
-    lgreen = '\033[92m'
-    print(lgreen + line + lend + str(number))
+    for i in range(0, 255):
+        curses.init_pair(i + 1, i, -1)
 
+    stdscr.addstr(line, column, txt, curses.color_pair(rgb))
+    stdscr.refresh()
 
-def red(line, number=""):
-    lend = '\33[0m'
-    lred = '\033[91m'
-    print(lred + line + lend + str(number))
+def clean_line_end():
 
+    for i in range(1,8):
+        stdscr = curses.initscr()       
+        stdscr.addstr(i, 0,'                                                    ')
+        stdscr.refresh()
 
-def cyan(line, number=""):
-    lend = '\33[0m'
-    lcyan = '\033[96m'
-    print(lcyan + line + lend + str(number))
