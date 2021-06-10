@@ -73,7 +73,7 @@ class Graph():
                 # Writing point to influxdb
                 self.write_api.write(bucket=self.bucket_name, org=self.org, record=p_syn)
             except Exception:
-                # TODO: fix this case
+                
                 self.stop_writing_thread()
                 raise Exception("[Graph mode] - Error while writing to influxdb instance: check your service or .ini file!")
 

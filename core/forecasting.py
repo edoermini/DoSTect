@@ -2,6 +2,7 @@ from scipy import optimize
 import random
 import sys
 import numpy as np
+import core.utils as utils
 
 
 class ExponentialSmoothing:
@@ -101,6 +102,7 @@ class SingleExponentialSmoothing(ExponentialSmoothing):
         )
 
         self.__smoothing_factor = forecasting_factors.x[0]
+        utils.colors(1,50,"Data SES Smoothing factor:     " + str(self.__smoothing_factor),8)
 
     def get_smoothed_value(self) -> float:
         return self.__smoothed_value
@@ -180,6 +182,9 @@ class DoubleExponentialSmoothing(ExponentialSmoothing):
 
         self.__smoothing_factor = forecasting_factors.x[0]
         self.__trend_factor = forecasting_factors.x[1]
+
+        utils.colors(2,50,"CUSUM DES Smoothing factor:     " + str(self.__smoothing_factor),8)
+        utils.colors(3,50,"CUSUM DES Trend factor:         " + str(self.__trend_factor),8)
 
     def get_smoothed_value(self) -> float:
         return self.__smoothed_value + self.__trend_value

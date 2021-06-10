@@ -140,7 +140,14 @@ class LiveCatcher(TrafficCatcher):
 
                 # graphing
                 if self.__graph:
-                    self.__plot.update_data((volume, threshold), time.time())
+                    self.__plot.update_data(
+                        (
+                            ("volume", float(volume)),
+                            ("threshold", float(threshold)),
+                            ("syn_counter", int(syn_count)),
+                            ("synack_counter", int(synack_count))
+                        ), time.time()
+                    )
 
                 self.__timestamp += self._time_interval
 

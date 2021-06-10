@@ -136,8 +136,8 @@ def main():
         exit(0)
 
     def print_statistics():
-
-        
+        utils.colors(0,0,"                                                        ",5)
+        utils.colors(0,0,"Status: monitoring ended",7)
         utils.colors(9,0,"Total intervals:           " + str(analyzer.get_total_intervals()),3)
         utils.colors(10,0,"Anomalous intervals count: " + str(analyzer.get_anomalous_intervals_count()),3)
         utils.colors(12,0,"Max volume reached:        " + str(analyzer.get_max_volume()),3)
@@ -147,8 +147,8 @@ def main():
         end_time =  analyzer.get_time_end()
 
         if start_time != 0 and end_time != 0:
-            utils.colors(14,0,"Attack start detected at:           " + str(datetime.fromtimestamp(start_time)),12)
-            utils.colors(15,0,"End attack detected at:             " + str(datetime.fromtimestamp(end_time)),12)
+            utils.colors(14,0,"Attack start detected at:       " + str(datetime.fromtimestamp(start_time)),12)
+            utils.colors(15,0,"End attack detected at:         " + str(datetime.fromtimestamp(end_time)),12)
 
     # Register handler for SIGINT
     signal.signal(signal.SIGINT, sigint_handler)
