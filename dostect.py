@@ -93,7 +93,7 @@ def main():
 
     # Initialize to default value if None
     if args.threshold is None:
-        args.threshold = 0.65
+        args.threshold = 0.05
 
     # Initialize to Graph module if -g mode
     plot = None

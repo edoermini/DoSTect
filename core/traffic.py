@@ -106,11 +106,11 @@ class LiveCatcher(TrafficCatcher):
         # current time minus last computation time
         diff_time = time.time() - self.__timestamp
 
+        syn_count = self._syn_counter
+        synack_count = self._synack_counter
+
         # checks if it's been at least self.__time_interval seconds and not more than self.__time_interval*2
         if self._time_interval <= diff_time < self._time_interval * 2:
-
-            syn_count = self._syn_counter
-            synack_count = self._synack_counter
 
             volume, threshold = self._counter_reader()
             

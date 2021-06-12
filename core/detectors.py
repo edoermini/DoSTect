@@ -4,14 +4,13 @@ import core.utils as utils
 import curses
 import time
 
-
-
+'''
 class CusumDetector:
     """
     Parametric cumulative sum implementation for anomaly detection
     """
 
-    def __init__(self, threshold, alpha=0.5, window_size=3):
+    def __init__(self, threshold, sigma=10, alpha=0.5, window_size=3):
 
         self._detection_threshold = threshold
 
@@ -23,6 +22,9 @@ class CusumDetector:
 
         # percentage beyond which the mean value (self.__mu) can be considered as anomalous behaviour
         self._alpha = alpha
+
+        #
+        self._sigma_square = sigma**2
 
         # the volume computed (used to check threshold excess)
         self._test_statistic = 0
@@ -75,23 +77,15 @@ class CusumDetector:
         # calculating window mean
         window_mean = sum(self.__window) / self.__window_size
 
-        #print(window_mean)
-
-        smoothing_factor = self._smoothing.get_smoothing_factor()
+        # print(window_mean)
 
         # saving previous values of mu and sigma
         last_mu = self._smoothing.get_smoothed_value()
-        last_sigma_square = self._sigma ** 2
 
         self._smoothing.forecast(window_mean)
 
-        # calculating simga value
-        self._sigma = math.sqrt(
-            smoothing_factor * last_sigma_square +
-            (1 - smoothing_factor) * (window_mean - last_mu) ** 2
-        )
-
-        self._z = window_mean - last_mu - 3*last_sigma_square
+        self._z = self._z + ((self._alpha * last_mu) / self._sigma_square) * (
+                value - last_mu - self._alpha * last_mu / 2)
 
     def _cusum_detection(self):
 
@@ -100,20 +94,18 @@ class CusumDetector:
         if not self._under_attack:
             # checking violation
             if self._test_statistic > self._detection_threshold:
-               
-               
-                utils.colors(0,0,"Status: DoS attack detected",197)
+                utils.colors(0, 0, "Status: DoS attack detected", 197)
                 self._time_start = time.time()
                 self._under_attack = True
 
         else:
             if self._test_statistic <= self._detection_threshold and self._z < 0:
                 # violation not detected
-               
-                utils.colors(0,0,"                                              ",1)
-                utils.colors(0,0,"Status: DoS attack ended",83)
+
+                utils.colors(0, 0, "                                              ", 1)
+                utils.colors(0, 0, "Status: DoS attack ended", 83)
                 self._time_end = time.time()
-               
+
                 self._test_statistic = 0
                 self._under_attack = False
 
@@ -137,6 +129,134 @@ class CusumDetector:
 
     def get_time_end(self):
         return self._time_end
+'''
+
+class CusumDetector:
+    """
+    Parametric cumulative sum implementation for anomaly detection
+    """
+
+    def __init__(self, threshold, sigma=100000, alpha=0.5, window_size=3):
+        self._detection_threshold = threshold
+
+        # the gaussian's variance
+        # intuitively indicates how much the new value is important in volume (self._test_statistics) computing
+        self._sigma = sigma
+
+        self._time_start = 0
+
+        self._time_end = 0
+
+        # maximum number of elements inside window
+        self.__window_size = window_size
+        # list of last self.__window_size elements
+        self.__window = []
+
+        # percentage beyond which the mean value (self.__mu) can be considered as anomalous behaviour
+        self._alpha = alpha
+
+        self._smoothing = SingleExponentialSmoothing()
+
+        # the volume computed (used to check threshold excess)
+        self._test_statistic = 0
+
+        self._under_attack = False
+
+        self._z = 0
+
+        # once read self.__window_size values starts to apply cusum to new values
+        self.__start_cusum = False
+
+    def _data_smoothing(self, value: float):
+        """
+        Cumulative sum (CUSUM) implementation. \n
+        Equation:
+            - g_{n} = max( (g_{n-1} + (alpha*mu_{n-1} / sigma^{2}) * (x_{n} - mu_{n-1} - alpha*mu_{n-1}/2) , 0) \n
+            - mu_{n} = beta*mu_{n-1} + (1- beta)*x_{n}
+        where x_{n} is the metric (number of SYN packets) at interval n
+        """
+
+        if len(self.__window) < self.__window_size:
+            # filling window
+
+            self.__window.append(value)
+            return
+
+        elif len(self.__window) == self.__window_size and not self.__start_cusum:
+            # first time that the window is full
+
+            self.__window.append(value)
+            self.__window = self.__window[1:]
+
+            self._smoothing.initialize(self.__window)
+
+            mean = self._smoothing.get_smoothed_value()
+
+            # calculating simga value
+            square_sum = 0
+            for val in self.__window:
+                square_sum += (val - mean) ** 2
+
+            self.__start_cusum = True
+
+        self.__window.append(value)
+        self.__window = self.__window[1:]
+
+        # calculating window mean
+        window_mean = sum(self.__window) / self.__window_size
+
+        # saving previous values of mu and sigma
+        last_mu = self._smoothing.get_smoothed_value()
+
+        self._smoothing.forecast(window_mean)
+
+        # calulating cusum value
+        self._z = ((self._alpha * last_mu) / self._sigma) * (
+                value - last_mu - self._alpha * last_mu / 2)
+
+    def _cusum_detection(self):
+        self._test_statistic = max(self._test_statistic + self._z, 0)
+
+        if not self._under_attack:
+            # checking violation
+            if self._test_statistic > self._detection_threshold:
+                utils.colors(0, 0, "Status: DoS attack detected", 197)
+                self._test_statistic = 0
+                self._time_start = time.time()
+                self._under_attack = True
+
+        else:
+            if self._test_statistic <= self._detection_threshold:
+                # violation not detected
+
+                utils.colors(0, 0, "                                              ", 1)
+                utils.colors(0, 0, "Status: DoS attack ended", 83)
+                self._time_end = time.time()
+
+                self._test_statistic = 0
+                self._under_attack = False
+
+    def update(self, value: float):
+        self._data_smoothing(value)
+        self._cusum_detection()
+
+        return self._test_statistic
+
+    def under_attack(self):
+        """
+        Tells if a DoS attack was detected
+
+        :return: True if an attack was detected, False otherwise
+        """
+
+        return self._under_attack
+
+    def get_time_start(self):
+        return self._time_start
+
+    def get_time_end(self):
+        return self._time_end
+
 
 class NPCusumDetector:
     """
@@ -229,9 +349,9 @@ class NPCusumDetector:
                 if self.__outlier_cum == self.__start_alarm_delay:
                     # reached required times to detect an attack
 
-                    utils.colors(0,0,"Status: DoS attack detected",197)
+                    utils.colors(0, 0, "Status: DoS attack detected", 197)
                     self._time_start = time.time()
-                    
+
                     self.__outlier_cum -= 1
                     self.__z_values.append(self._z)
                     self._under_attack = True
@@ -276,7 +396,7 @@ class NPCusumDetector:
         # calculating window mean
         window_mean = sum(self.__window) / self.__window_size
 
-        #print(window_mean)
+        # print(window_mean)
 
         # saving previous values of mu and sigma
         last_mu = self._smoothing.get_smoothed_value()
@@ -315,10 +435,10 @@ class NPCusumDetector:
 
                 if self._test_statistic >= self._detection_threshold:
                     # under attack
-                    
-                    utils.colors(0,0,"Status: DoS attack detected",197)
+
+                    utils.colors(0, 0, "Status: DoS attack detected", 197)
                     self._time_start = time.time()
-                 
+
                     self._under_attack = True
                     self.__z_values.append(self._z)
             else:
@@ -396,8 +516,8 @@ class NPCusumDetector:
                     self.__abrupt_decrease_cum -= 1
 
     def __clear(self):
-        utils.colors(0,0,"                                              ",1)
-        utils.colors(0,0,"Status: DoS attack ended",83)
+        utils.colors(0, 0, "                                              ", 1)
+        utils.colors(0, 0, "Status: DoS attack ended", 83)
         self._time_end = time.time()
 
         self._under_attack = False
@@ -439,7 +559,6 @@ class SYNNPCusumDetector(NPCusumDetector):
         self.intervals = 0
         self._verbose = verbose
 
-
     def analyze(self, syn_count: int, synack_count: int):
         syn_value = 0.0
 
@@ -450,16 +569,16 @@ class SYNNPCusumDetector(NPCusumDetector):
 
         self.intervals += 1
         self.update(syn_value)
-        
-        utils.colors(1,0,"Interval number:     " + str(self.intervals),8)
-        utils.colors(2,0,"SYN volume:          " + str(self._test_statistic),8)
-        utils.colors(3,0,"SYN Threshold:       " + str(self._detection_threshold),8)
-        if self._verbose:
-            utils.colors(4, 0, "SYN Value:     " + str(syn_value),8)
-            utils.colors(5, 0, "SYN Zeta:      " + str(self._z),8)
-            utils.colors(6, 0, "SYN Sigma:     " + str(self._sigma),8)
-            utils.colors(7, 0, "SYN Mu:        " + str(self._smoothing.get_smoothed_value()),8)
 
+        utils.clean_line_end()
+        utils.colors(1, 0,     "Interval number:     " + str(self.intervals), 8)
+        utils.colors(2, 0,     "SYN volume:          " + str(self._test_statistic), 8)
+        utils.colors(3, 0,     "SYN Threshold:       " + str(self._detection_threshold), 8)
+        if self._verbose:
+            utils.colors(4, 0, "SYN Value:           " + str(syn_value), 8)
+            utils.colors(5, 0, "SYN Zeta:            " + str(self._z), 8)
+            utils.colors(6, 0, "SYN Sigma:           " + str(self._sigma), 8)
+            utils.colors(7, 0, "SYN Mu:              " + str(self._smoothing.get_smoothed_value()), 8)
 
         return self._test_statistic, self._detection_threshold
 
@@ -470,25 +589,18 @@ class SYNCusumDetector(CusumDetector):
         self.intervals = 0
         self._verbose = verbose
 
-    def analyze(self, syn_count: int, synack_count: int):
-        syn_value = 0.0
-
-        if syn_count != 0:
-            syn_value = float(syn_count - synack_count) / float(syn_count)
-
-        syn_value = max(syn_value, 0)
-
+    def analyze(self, syn_count: int, *args):
         self.intervals += 1
-        self.update(syn_value)
+        self.update(syn_count)
+
         utils.clean_line_end()
-        utils.colors(1,0,"Interval number:     " + str(self.intervals),8)
-        utils.colors(2,0,"SYN volume:     " + str(self._test_statistic),8)
-        utils.colors(3,0,"SYN Threshold: " + str(self._detection_threshold),8)
+        utils.colors(1, 0,     "Interval number:     " + str(self.intervals), 8)
+        utils.colors(2, 0,     "SYN volume:          " + str(self._test_statistic), 8)
+        utils.colors(3, 0,     "SYN Threshold:       " + str(self._detection_threshold), 8)
         if self._verbose:
-            utils.colors(4, 0, "SYN Value: " + str(syn_value),8)
-            utils.colors(5, 0, "SYN Zeta: " + str(self._z),8)
-            utils.colors(6, 0, "SYN Sigma: " + str(self._sigma),8)
-            utils.colors(7, 0, "SYN Mu: " + str(self._smoothing.get_smoothed_value()),8)
-        
-        
+            utils.colors(4, 0, "SYN Value:           " + str(syn_count), 8)
+            utils.colors(5, 0, "SYN Zeta:            " + str(self._z), 8)
+            utils.colors(6, 0, "SYN Sigma:           " + str(self._sigma), 8)
+            utils.colors(7, 0, "SYN Mu:              " + str(self._smoothing.get_smoothed_value()), 8)
+
         return self._test_statistic, self._detection_threshold
