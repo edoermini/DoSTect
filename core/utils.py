@@ -15,6 +15,6 @@ def clean_line_end():
 
     for i in range(1,8):
         stdscr = curses.initscr()       
-        stdscr.addstr(i, 0,'                                                    ')
+        stdscr.addstr(i, 0,'                                                ')
         stdscr.refresh()
 

@@ -29,17 +29,25 @@ class Graph():
         self.__writing_thread = None
 
         client = None
+        result = 0
         try:
             # Load influx configuration from .ini file: retrieve HOST:PORT, ORG ID, ACCESS TOKEN
             client = influxdb_client.InfluxDBClient.from_config_file(config_file=config_file)
 
             self.org = client.org
 
-            # Creating buckets API for buckets access
+                # Creating buckets API for buckets access
             bucket = client.buckets_api()
 
             # Checks if bucket bucket_name already exists, else create it
-            if bucket.find_bucket_by_name(self.bucket_name) is None:
+            try: #API call to InfluxCloud return an exception
+                result = bucket.find_bucket_by_name(self.bucket_name)
+            except:
+                bucket.create_bucket(bucket_name=self.bucket_name)
+                utils.colors(8,0,"[Graph mode] - Bucket " + self.bucket_name + " created!", 3)
+            
+            #API call to local influxd service return None
+            if result is None:
                 bucket.create_bucket(bucket_name=self.bucket_name)
                 utils.colors(8,0,"[Graph mode] - Bucket " + self.bucket_name + " created!", 3)
 
