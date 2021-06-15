@@ -146,7 +146,7 @@ def main():
         start_time = analyzer.get_time_start()
         end_time =  analyzer.get_time_end()
 
-        if start_time != 0 and end_time != 0:
+        if args.file is None and start_time != 0 and end_time != 0:
             utils.colors(14,0,"Attack start detected at:       " + str(datetime.fromtimestamp(start_time)),12)
             utils.colors(15,0,"End attack detected at:         " + str(datetime.fromtimestamp(end_time)),12)
 

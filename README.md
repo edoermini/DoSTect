@@ -1,6 +1,6 @@
 # DoSTect
 
-DoSTect is a tool created to detect SYN flooding attacks in two **operating modes** : **online** (in which it observes the incoming and outgoing packets in real time) and **offline** (in which it observes a **pcap** file containing a passed scan of the network traffic).
+DoSTect is high intensity SYN flooding attacks detection tool that operates in two modes : **online** (in which it observes the incoming and outgoing packets in real time) and **offline** (in which it observes a **pcap** file).
 
 In both modes the logic behind the detection is based on a type of a statistical method called **CUSUM** (Cumulative Sum).
 The CUSUM algorithm belongs to the family of change point detection algorithms that are based on hypothesis testing, as its name implies, it involves a cumulative sum of a statistical data records added to some weights and when the sum exceeds a certain threshold an anomaly is detected. 
@@ -32,8 +32,6 @@ where ![formula](https://render.githubusercontent.com/render/math?math=\alpha) i
 
 If the volume computed goes beyond a given fixed threshold an alarm is raised.
 
-
-
 # Non-Parametric CUSUM
 
 For this type of CUSUM, we based our implementation on [2].
@@ -63,12 +61,10 @@ This detection method consists of three main modules:
         <img width=230 src=https://render.githubusercontent.com/render/math?math=z_{n}=y_{n}-\widetilde{\mu}_{n-1}-3\widetilde{\sigma}_{n-1}>
     </p>
 
-
-    
-
 3. **Adaptive CUSUM Detection**
 
-    In this module the volume is updated using the random sequence z and according to that value either, if the z value is equal or less than 0, the exponentially weighted moving average and the variance are computed or, if z if greater than 0, the detection threshold is updated. In case the detection threshold is updated a threshold crossing control is made.
+    In this module the volume is updated using the random sequence ![formula](https://render.githubusercontent.com/render/math?math=z_{n}) and according to that value either, if the ![formula](https://render.githubusercontent.com/render/math?math=z_{n}) value is equal or less than 0, the exponentially weighted moving average and the variance are computed or, if ![formula](https://render.githubusercontent.com/render/math?math=z_{n}) if greater than 0, the detection threshold is updated. 
+    In case the detection threshold is updated a threshold crossing control is made.
 
 # Description
 
@@ -82,7 +78,8 @@ The project is divided in the following parts:
     * **traffic.py**: contains traffic analysis classes
     * **utils.py**: contains general utilities
 * **/config/influxdb**:
-     * **config.ini**: contains influxdb's configuration options
+    * **config.ini**: contains influxdb's configuration options
+    * **dostect.json**: dashboard configuration to import in influxdb
 
 # Usage
 Install dependencies: 
@@ -126,6 +123,24 @@ token="influx db token created with read/write rights"
 timeout="api request timeout in ms"
 verify_ssl="True if there is necessity to verify ssl connection, False otherwise"
 ```
+
+# Testing
+To test the tool we used [hping3](https://tools.kali.org/information-gathering/hping3) to simulate traffic anomalies and attacks. To simulate an anomaly during a live traffic capture (*-i [INTERFACE]* option) run the following command from a machine on the same network or on a VM locally to the network:
+```
+sudo hping3 -c [MAX PACKETS] -S --flood --rand-source -p [PORT] [TARGET INTERFACE ADDRESS]
+```
+To test the offline capture [2 pcap files](https://mega.nz/file/B8VyjDQB#k6l-ao_TQcmfSFYpVbZ-AqNQA888jSRA5VnveAokegg) are provided: the first with an attack duration of about 30 seconds, the second with an attack duration of about 2 minutes. 
+In offline analysis it's necessary provide the monitored machine network local address with *-a [ADDRESS]* option.
+The machine attacked in pcap files has ip 192.168.1.9 so to run the analysis is important to secify the right ip address with `-a 192.168.1.9` flag.
+The offline analysis might take a lot of time in relation to the attack's intensity and duration.
+
+
+# Limitations
+* The tool needs a certain number of intervals (default 4) of analysis before start the detection in order to compute smoothing factors used to forecast next values. So the tool won't work properly if started during an attack.
+* The tool implements only SYN flooding attack type detection, so other kinds of attacks such like UDP flooding attacks or ICMP flooding attacks won't be detected.
+* With the paramentric CUSUM method it's necessary to know the normal network behaviour to give a reasonable threshold and parameters values, in order to avoid false positives or negatives. Experimental evidence on domestic networks led to determine the threshold value of 5.
+* 
+
 # References
 [1]: [Application of anomaly detection algorithms for detecting SYN flooding attacks, V.A. Siris; F. Papagalou, IEEE, 2005](https://ieeexplore.ieee.org/document/1378372)
 
