@@ -139,7 +139,7 @@ The offline analysis might take a lot of time in relation to the attack's intens
 * The tool needs a certain number of intervals (default 4) of analysis before start the detection in order to compute smoothing factors used to forecast next values. So the tool won't work properly if started during an attack.
 * The tool implements only SYN flooding attack type detection, so other kinds of attacks such like UDP flooding attacks or ICMP flooding attacks won't be detected.
 * With the paramentric CUSUM method it's necessary to know the normal network behaviour to give a reasonable threshold and parameters values, in order to avoid false positives or negatives. Experimental evidence on domestic networks led to determine the threshold value of 5.
-* 
+
 
 # References
 [1]: [Application of anomaly detection algorithms for detecting SYN flooding attacks, V.A. Siris; F. Papagalou, IEEE, 2005](https://ieeexplore.ieee.org/document/1378372)

@@ -46,7 +46,7 @@ def main():
                         type=lambda x: is_valid_capture(parser, x))
 
     parser.add_argument('-s', '--slice', dest='interval', action='store',default=5.0,
-                        help="Specify duration of time interval observation in seconds (e.g: 5)")
+                        help="Specify duration of time interval observation in seconds (default: 5)")
    
     parser.add_argument("-p", "--parametric",  action='store', dest="param",type=bool, nargs='?',
                         const=True, default=False,
