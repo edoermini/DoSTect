@@ -32,6 +32,7 @@ def is_valid_interface(parser, arg):
 
 
 def main():
+
     parser = argparse.ArgumentParser(description="DoSTect allow to detect SYN flooding attack with Parametric/Non Parametric CUSUM change point detection")
     
     # Create an exclusive group: in this group only one parameter can be used at time
@@ -104,6 +105,7 @@ def main():
             utils.colors(7,0,"[Graph startup] - Error while connecting to influxdb instance: check your influxd service!", 12)
             sys.exit(1)
 
+    os.environ['TERM'] = "xterm-256color"
     # Start live capture if file is None (-i [INTERFACE] mode)
     if args.file is None:
         analyzer = LiveCatcher(
