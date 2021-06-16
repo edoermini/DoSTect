@@ -1,5 +1,4 @@
 # DoSTect
-
 DoSTect is high intensity SYN flooding attacks detection tool that operates in two modes : **online** (in which it observes the incoming and outgoing packets in real time) and **offline** (in which it observes a **pcap** file).
 
 In both modes the logic behind the detection is based on a type of a statistical method called **CUSUM** (Cumulative Sum).
@@ -9,7 +8,12 @@ This statistical method is used and implemented in two different ways that are *
 
 The tool provides also the possibility to store the measurements done in an **InfluxDB** database, in which those values are plotted on a dedicated dashboard.
 
-# Parametric CUSUM
+# Implementation description
+In both algorithms is used a Single Exponential Smoothing (SES) algorithm to forecast next value from previous records used later to compute volume. 
+The forecasting algorithm has a parameter called smoothing factor and it's optimal value should be between 0.95 and 0.99 as said in [1].
+To compute the optimal smoothing factor in relation to the network conditions we use a certain number of intervals (default 4) to estimate that value with [SLSQP](https://docs.scipy.org/doc/scipy/reference/optimize.minimize-slsqp.html) alghorithm from SciPy library.
+
+## Parametric CUSUM
 
 For this type of CUSUM, we based our implementation on [1] in which 2 algorithms are presented: adaptive threshold algorithm, Cumulative Sum (CUSUM) algorithm.
 For our aims only the second algorithm was implemented.
@@ -32,7 +36,7 @@ where ![formula](https://render.githubusercontent.com/render/math?math=\alpha) i
 
 If the volume computed goes beyond a given fixed threshold an alarm is raised.
 
-# Non-Parametric CUSUM
+## Non-Parametric CUSUM
 
 For this type of CUSUM, we based our implementation on [2].
 
@@ -65,6 +69,34 @@ This detection method consists of three main modules:
 
     In this module the volume is updated using the random sequence ![formula](https://render.githubusercontent.com/render/math?math=z_{n}) and according to that value either, if the ![formula](https://render.githubusercontent.com/render/math?math=z_{n}) value is equal or less than 0, the exponentially weighted moving average and the variance are computed or, if ![formula](https://render.githubusercontent.com/render/math?math=z_{n}) if greater than 0, the detection threshold is updated. 
     In case the detection threshold is updated a threshold crossing control is made.
+
+# Aim 
+The aim of this tool is to analyze the network traffic ingoing and outgoing from a single machine, in particular exchanged TCP packets, in order to detect anomalies inside it.
+This tool considers only anomalies derivated from DoS/DDoS attacks where the number of incoming SYN packets increases quickly and it's greater than the number of SYN/ACK packets in a certain consecutive number of times interval.
+The accuracy of the tool depends on these factors: type of CUSUM algorithm and parameters values (i.e. detection threshold in parametric CUSUM).
+
+## Parametric CUSUM
+
+## Accuracy
+The parametric CUSUM algorithm's accuracy depends on the threshold's value, in fact high or low threshold's values in relation to network conditions can lead to false positives or negatives. 
+Experimental evidences show us that a threshold value equals to 5.0 allows to correctly detect anomalies, simulated with an interval time between packets of about 1000 microseconds.
+
+### Attack duration
+For the Parametric CUSUM as said for the minimum packet rate the minimum duration of an attack depends on the threshold's avalue. 
+
+## Non parametric CUSUM
+
+### Accuracy
+The non parametric CUSUM algorithm detects without errors SYN flooding attacks with an interval time between packets of about 475 microseconds.
+
+### Attack duration
+The minimum duration of an attack for the non parmateric CUSUM should be about 20 seconds to allow the algorithm to detect the anomaly.
+
+# Limitations
+* The tool needs a certain number of intervals (default 4) of analysis before start the detection in order to compute smoothing factors used to forecast next values. So the tool won't work properly if started during an attack.
+* The tool implements only SYN flooding attack type detection, so other kinds of attacks such like UDP flooding attacks or ICMP flooding attacks won't be detected.
+* With the paramentric CUSUM method it's necessary to know the normal network behaviour to give a reasonable threshold and parameters values, in order to avoid false positives or negatives.
+* Both algorithms don't distinguish between requests made to an inactive service and a SYN flooding attack to an exposed service, this can lead to false positives in case a inactive service is requested multiple times. 
 
 # Description
 
@@ -127,19 +159,12 @@ verify_ssl="True if there is necessity to verify ssl connection, False otherwise
 # Testing
 To test the tool we used [hping3](https://tools.kali.org/information-gathering/hping3) to simulate traffic anomalies and attacks. To simulate an anomaly during a live traffic capture (*-i [INTERFACE]* option) run the following command from a machine on the same network or on a VM locally to the network:
 ```
-sudo hping3 -c [MAX PACKETS] -S --flood --rand-source -p [PORT] [TARGET INTERFACE ADDRESS]
+sudo hping3 -c [MAX PACKETS] -S -i u475 --rand-source -p [PORT] [TARGET INTERFACE ADDRESS]
 ```
 To test the offline capture [2 pcap files](https://mega.nz/file/B8VyjDQB#k6l-ao_TQcmfSFYpVbZ-AqNQA888jSRA5VnveAokegg) are provided: the first with an attack duration of about 30 seconds, the second with an attack duration of about 2 minutes. 
 In offline analysis it's necessary provide the monitored machine network local address with *-a [ADDRESS]* option.
 The machine attacked in pcap files has ip 192.168.1.9 so to run the analysis is important to secify the right ip address with `-a 192.168.1.9` flag.
 The offline analysis might take a lot of time in relation to the attack's intensity and duration.
-
-
-# Limitations
-* The tool needs a certain number of intervals (default 4) of analysis before start the detection in order to compute smoothing factors used to forecast next values. So the tool won't work properly if started during an attack.
-* The tool implements only SYN flooding attack type detection, so other kinds of attacks such like UDP flooding attacks or ICMP flooding attacks won't be detected.
-* With the paramentric CUSUM method it's necessary to know the normal network behaviour to give a reasonable threshold and parameters values, in order to avoid false positives or negatives. Experimental evidence on domestic networks led to determine the threshold value of 5.
-* 
 
 # References
 [1]: [Application of anomaly detection algorithms for detecting SYN flooding attacks, V.A. Siris; F. Papagalou, IEEE, 2005](https://ieeexplore.ieee.org/document/1378372)

@@ -83,9 +83,11 @@ class CusumDetector:
 
         self._smoothing.forecast(window_mean)
 
+        alpha_times_mu = self._alpha * last_mu
+
         # calulating cusum value
-        self._z = ((self._alpha * last_mu) / self._sigma) * (
-                value - last_mu - self._alpha * last_mu / 2)
+        self._z = (alpha_times_mu / self._sigma) * (
+                value - last_mu - alpha_times_mu / 2)
 
     def _cusum_detection(self):
         self._test_statistic = max(self._test_statistic + self._z, 0)
@@ -210,6 +212,8 @@ class NPCusumDetector:
 
         self.__alarm_dur = 0
 
+        self.__smoothing_factor = 0
+
     def _outlier_processing(self, value: float) -> bool:
 
         if value > self.__outlier_threshold:
@@ -257,6 +261,7 @@ class NPCusumDetector:
             self.__window = self.__window[1:]
 
             self._smoothing.initialize(self.__window)
+            self.__smoothing_factor = self._smoothing.get_smoothing_factor()
 
             mean = self._smoothing.get_smoothed_value()
 
@@ -294,12 +299,10 @@ class NPCusumDetector:
         # calculating window exponentially weighted moving average
         self._smoothing.forecast(window_mean)
 
-        smoothing_factor = self._smoothing.get_smoothing_factor()
-
         # calculating simga value
         self._sigma = math.sqrt(
-            smoothing_factor * last_sigma_square +
-            (1 - smoothing_factor) * (window_mean - last_mu) ** 2
+            self.__smoothing_factor * last_sigma_square +
+            (1 - self.__smoothing_factor) * (window_mean - last_mu) ** 2
         )
 
     def _cusum_detection(self):
