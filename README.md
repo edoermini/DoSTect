@@ -29,7 +29,7 @@ where ![formula](https://render.githubusercontent.com/render/math?math=x_{n}) is
 
 The volume is computed with the following formula:
 <p align="center">
-    <img width=400 src=https://render.githubusercontent.com/render/math?math=g_{n}=\left[g_{n-1}+\frac{\alpha\overline{\mu}_{n-1}}{\sigma^{2}}\cdot\left(x_{n}-\overline{\mu}_{n-1}-\frac{\alpha\overline{\mu}_{n-1}}{2}\right)\right]^{+}>
+    <img width=400 src=https://render.githubusercontent.com/render/math?math=g_{n}=\left[g_{n-1} + \frac{\alpha\overline{\mu}_{n-1}}{\sigma^{2}}\cdot\left(x_{n}-\overline{\mu}_{n-1}-\frac{\alpha\overline{\mu}_{n-1}}{2}\right)\right]^{+}>
 </p>
 
 where ![formula](https://render.githubusercontent.com/render/math?math=\alpha) is the amplitude percentageparameter, which intuitively corresponds to the most probablepercentage of increase of the mean rate after a change (attack) has occurred, and ![formula](https://render.githubusercontent.com/render/math?math=\sigma^{2}) is the variance of Gaussians random variables used to model the variations of incoming SYN traffic (a value derivated from a classical CUSUM equation).
